@@ -324,3 +324,6 @@ ENTRY(sys_call_table)
 	.long sys_timerfd
 	.long sys_eventfd
 	.long sys_fallocate
+    .long sys_qqservice     /* 325 --- CHANGES START HERE */
+    .long sys_qqservice_named_attach
+    .long sys_qqservice_named_op
