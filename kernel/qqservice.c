@@ -17,7 +17,7 @@ asmlinkage int sys_qqservice(int op, void * msg, int size) {
         return sys_qqmodule(op, msg, size);
 }
 
-asmlinkage int sys_qqservice_named_attach(void * name) {
+asmlinkage int sys_qqservice_named_attach(void * name, int pid) {
     if(sys_qqservice_named_attach_impl == 0)
         return -1;
     else

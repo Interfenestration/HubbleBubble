@@ -615,8 +615,8 @@ asmlinkage long sys_fallocate(int fd, int mode, loff_t offset, loff_t len);
 
 /* ---- CHANGES START HERE ---- */
 asmlinkage int sys_qqservice(int op, void * msg, int size);
-asmlinkage int sys_qqservice_named_attach(void * name);
-asmlinkage int sys_qqservice_named(int op, int queueId);
+asmlinkage int sys_qqservice_named_attach(void * name, int pid);
+asmlinkage int sys_qqservice_named(int op, int queueId, int pid);
 
 int kernel_execve(const char *filename, char *const argv[], char *const envp[]);
 
