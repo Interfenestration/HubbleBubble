@@ -22,7 +22,7 @@ struct Queue {
 } queue_list[MAX_LIST_SIZE] __init_data;
 
 struct Connection {
-	int pid;
+	pid_t pid;
 	int queue_id;
 } map[MAX_LIST_SIZE] __init_data;
 
@@ -35,7 +35,7 @@ static void __exit qqmodule_exit(void) {
     printk("qqmodule exited");
 }
 
-int sys_qqmodule(int op, void * msg, int size) {
+int sys_qqmodule(int op, int queue_id, char* msg, int size) {
     switch(op) {
 	case LF_SEND:
 		return send_message(msg, size);
@@ -54,22 +54,22 @@ int send_message(char* msg, int size) {
  * If everything goes well, returns a non-negative int representing
  * the queue_id, else returns a negative int.
  */
-int sys_qqmodule_named_attach(void * name, int pid) {
-	if(name == NULL )
-		return -1;
-	// TODO And what happens if name is not char*?
-	char * kname;
+int sys_qqmodule_named_attach(char* name, pid_t pid) {
+	char* kname;
 	int name_length;
 	int queue_id;
-	// TODO Is a cast to char* necessary?
-	name_length = strlen_user(name);
-	kname = malloc(sizeof(char) * name_length);
+
+	if(name == NULL )
+		return -1;
+
+	name_length = strlen(name);
+	kname = kmalloc(sizeof(char) * name_length);
 	// Returns 0 (false) if it was successfull (yeah, it confuses me too)
 	if(copy_from_user(kname, name, name_length) != 0)
 		return -1;
 
 	if(free_space() == 0)
-		return -1;
+		return -2;
 
 	queue_id = get_queue(kname, pid);
 	queue_attach(pid, queue_id);
@@ -87,7 +87,7 @@ int free_space() {
 }
 
 /* Attachs the given pid to the queue with the given queue_id. */
-int queue_attach(int pid, int queue_id) {
+int queue_attach(pid_t pid, int queue_id) {
 	Connection c;
 	Queue q;
 	int i;
@@ -102,12 +102,20 @@ int queue_attach(int pid, int queue_id) {
 	// TODO else what? fails? block?
 }
 
+Connection create_connection(pid_t pid, int queue_id) {
+	Connection c = {
+		.pid = pid;
+		.queue_id = queue_id;
+	}
+	return c;
+}
+
 /*
  * Tries to find a queue with the given name.
  * If it exists, it simply returns its index. If not, it creates
  * a new one, adds it to the array and returns its index.
  */
-int get_queue(char * name, int pid) {
+int get_queue(char* name, pid_t pid) {
 	Queue current_queue;
 	int i;
 	for(i = 0; i < MAX_LIST_SIZE; i++) {
@@ -127,7 +135,7 @@ int get_queue(char * name, int pid) {
  * Pre-condition: There is no previously created queue with this name.
  * TODO Make this thread-safe
  */
-int create_queue(char* name, int pid) {
+int create_queue(char* name, pid_t pid) {
 	Queue q;
 	int i;
 
@@ -146,7 +154,7 @@ int create_queue(char* name, int pid) {
 /*
  * Creates, inits and returns a queue struct with the given name.
  */
-queue new_queue(char* name, int pid) {
+Queue new_queue(char* name, pid_t pid) {
 	Queue q = {
 		.name = name;
 		.pid_list[0] = pid;
@@ -157,7 +165,7 @@ queue new_queue(char* name, int pid) {
 	return q;
 }
 
-int sys_qqmodule_named(int op, int queue_id, int pid) {
+int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
 	switch(op) {
 	case LF_LEAVE:
 		return leave_queue(queue_id, pid);
@@ -167,35 +175,50 @@ int sys_qqmodule_named(int op, int queue_id, int pid) {
 
 /* Removes the given pid from the queue with the given queue_id */
 int leave_queue(int queue_id, int pid) {
-	int[] pid_list;
 	int conn_index;
 
+	if(queue_id > MAX_LIST_SIZE)
+		return -1;
+
 	for(conn_index = 0; i < MAX_LIST_SIZE; i++)
-		if(map[conn_index] != NULL && map[conn_index].pid == pid)
+		if(map[conn_index] != NULL &&
+		   map[conn_index].pid == pid &&
+		   map[conn_index].queue_id == queue_id)
 			break;
 
 	// Not found
-	if(pid_index >= MAX_LIST_SIZE)
-		return -1;
+	if(conn_index > MAX_LIST_SIZE)
+		return -2;
 
 	// TODO insert thread-safeness
-	queue_list[queue_id].
-	pid_list[pid_index] = pid_list[pid_tail - 1];
-	q.pid_tail--;
+	map[conn_index] = NULL;
+	if(queue_list[queue_id].pid_number == 1)
+		destroy_queue(queue_id);
+	else
+		queue_list[queue_id].pid_number -= 1;
+	
 	return 0;
 }
+
 /*
  * Destroys the queue with the given queue_id, unlocking
  * all locked processes.
  * TODO Unlock the locked processes
  */
 int destroy_queue(int queue_id) {
-	Queue q = list_queue[queue_id];
+	int i;
+	Queue q;
+
+	q = list_queue[queue_id];
 //	Something like this for the process unlocking (+thread-safety)
 //	for(int i = 0; i < q.pid_tail; i++)
 //		unlock(q.pid_list[i])
 	free(&queue_list[queue_id]);
 	queue_list[queue_id] = NULL;
+
+	for(i = 0; i < MAX_LIST_SIZE; i++)
+		if(map[i].queue_id == queue_id)
+			map[i] = NULL;
 	return 0;
 }
 
