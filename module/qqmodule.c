@@ -11,8 +11,12 @@
 
 struct queue {
     char * name;
+    int pid_list[MAX_LIST_SIZE];
+    int pid_tail;
+    int messages_tail;
+    int messages_head;
     char * messages[MAX_LIST_SIZE];
-} queue_list[MAX_LIST_SIZE]
+} queue_list[MAX_LIST_SIZE] __init_data;
 
 static int __init qqmodule_init(void) {
     printk("qqmodule init");
