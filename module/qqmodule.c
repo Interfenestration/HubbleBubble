@@ -10,15 +10,21 @@
 #define MAX_LIST_SIZE 30
 #define LF_LEAVE 1
 #define LF_DESTROY 2
+#define LF_SEND 1
+#define LF_RECEIVE 2
 
-struct queue {
+struct Queue {
     char * name;
-    int pid_list[MAX_LIST_SIZE];
-    int pid_tail;
+    int pid_number;
     int messages_tail;
     int messages_head;
     char * messages[MAX_LIST_SIZE];
 } queue_list[MAX_LIST_SIZE] __init_data;
+
+struct Connection {
+	int pid;
+	int queue_id;
+} map[MAX_LIST_SIZE] __init_data;
 
 static int __init qqmodule_init(void) {
     printk("qqmodule init");
@@ -30,14 +36,23 @@ static void __exit qqmodule_exit(void) {
 }
 
 int sys_qqmodule(int op, void * msg, int size) {
-    return 0;
+    switch(op) {
+	case LF_SEND:
+		return send_message(msg, size);
+	case LF_RECEIVE:
+		return receive_message(msg, size);
+	}
+}
+
+int send_message(char* msg, int size) {
+	//TODO f9u12	
 }
 
 /*
- * Attached a given process to the queue with the given name.
+ * Attach a given process to the queue with the given name.
  * If a queue with the given name does not exist, creates it.
  * If everything goes well, returns a non-negative int representing
- * the queue_id, else returns a negative number.
+ * the queue_id, else returns a negative int.
  */
 int sys_qqmodule_named_attach(void * name, int pid) {
 	if(name == NULL )
@@ -53,16 +68,37 @@ int sys_qqmodule_named_attach(void * name, int pid) {
 	if(copy_from_user(kname, name, name_length) != 0)
 		return -1;
 	
+	if(free_space() == 0)
+		return -1;
+
 	queue_id = get_queue(kname, pid);
 	queue_attach(pid, queue_id);
     return queue_id;
 }
 
+/* Returns the free space in the Connection map */
+int free_space() {
+	int i;
+	int count = 0;
+	for(i = 0; i < MAX_LIST_SIZE; i++)
+		if(map[i] != null)
+			count++;
+	return count;
+}
+
 /* Attachs the given pid to the queue with the given queue_id. */
 int queue_attach(int pid, int queue_id) {
-	queue q = queue_list[queue_id];
-	if(q.pid_tail <= MAX_LIST_SIZE)
-		q.pid_list[tail++] = pid;
+	Connection c;
+	Queue q;
+	int i;
+	c = create_connection(pid, queue_id);
+	q = queue_list[queue_id];
+	
+	for(i = 0; i < MAX_LIST_SIZE; i++)
+		if(map[i] == NULL) {
+			map[i] = c;
+			q.pid_number += 1;
+		}
 	// TODO else what? fails? block?
 }
 
@@ -72,7 +108,7 @@ int queue_attach(int pid, int queue_id) {
  * a new one, adds it to the array and returns its index.
  */
 int get_queue(char * name, int pid) {
-	queue current_queue;
+	Queue current_queue;
 	int i;
 	for(i = 0; i < MAX_LIST_SIZE; i++) {
 		current_queue = queue_list[i];
@@ -92,8 +128,9 @@ int get_queue(char * name, int pid) {
  * TODO Make this thread-safe
  */
 int create_queue(char* name, int pid) {
-	queue q;
+	Queue q;
 	int i;
+
 	q = new_queue(char* name, pid);
 
 	for(i = 0; i < MAX_LIST_SIZE; i++) {
@@ -110,10 +147,10 @@ int create_queue(char* name, int pid) {
  * Creates, inits and returns a queue struct with the given name.
  */
 queue new_queue(char* name, int pid) {
-	queue q = {
+	Queue q = {
 		.name = name;
 		.pid_list[0] = pid;
-		.pid_tail = 1;
+		.pid_number = 1;
 		.messages_tail = 0;
 		.messages_head = 0;
 	}
@@ -131,19 +168,18 @@ int sys_qqmodule_named(int op, int queue_id, int pid) {
 /* Removes the given pid from the queue with the given queue_id */
 int leave_queue(int queue_id, int pid) {
 	int[] pid_list;
-	int pid_index, pid_tail;
-	queue q;
-	q = queue_list[queue_id];
-	pid_list = q.pid_list;
-	pid_tail = q.pid_tail;
-	for(pid_index = 0; i < pid_tail; i++)
-		if(pid_list[pid_index] == pid)
+	int conn_index;
+
+	for(conn_index = 0; i < MAX_LIST_SIZE; i++)
+		if(map[conn_index] != NULL && map[conn_index].pid == pid)
 			break;
 	
-	if(pid_index >= pid_tail)
+	// Not found
+	if(pid_index >= MAX_LIST_SIZE)
 		return -1;
 
 	// TODO insert thread-safeness
+	queue_list[queue_id].
 	pid_list[pid_index] = pid_list[pid_tail - 1];
 	q.pid_tail--;
 	return 0;
@@ -154,7 +190,7 @@ int leave_queue(int queue_id, int pid) {
  * TODO Unlock the locked processes
  */
 int destroy_queue(int queue_id) {
-	queue q = list_queue[queue_id];
+	Queue q = list_queue[queue_id];
 //	Something like this for the process unlocking (+thread-safety)
 //	for(int i = 0; i < q.pid_tail; i++)
 //		unlock(q.pid_list[i])
@@ -164,11 +200,11 @@ int destroy_queue(int queue_id) {
 }
 
 int lfsend(const void * msg, int size) {
-    return syscall(__NR_qqservice, 1, cp_msg, size);
+    return syscall(__NR_qqservice, LF_SEND, cp_msg, size);
 }
 
 int lfreceive(void * msg, int size) {
-    return syscall(__NR_qqservice, 2, cp_msg_size);
+    return syscall(__NR_qqservice, LF_RECEIVE, NULL, cp_msg_size);
 }
 
 /*
