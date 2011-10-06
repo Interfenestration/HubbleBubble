@@ -45,7 +45,7 @@ int sys_qqmodule(int op, void * msg, int size) {
 }
 
 int send_message(char* msg, int size) {
-	//TODO f9u12	
+	//TODO f9u12
 }
 
 /*
@@ -67,7 +67,7 @@ int sys_qqmodule_named_attach(void * name, int pid) {
 	// Returns 0 (false) if it was successfull (yeah, it confuses me too)
 	if(copy_from_user(kname, name, name_length) != 0)
 		return -1;
-	
+
 	if(free_space() == 0)
 		return -1;
 
@@ -93,7 +93,7 @@ int queue_attach(int pid, int queue_id) {
 	int i;
 	c = create_connection(pid, queue_id);
 	q = queue_list[queue_id];
-	
+
 	for(i = 0; i < MAX_LIST_SIZE; i++)
 		if(map[i] == NULL) {
 			map[i] = c;
@@ -173,7 +173,7 @@ int leave_queue(int queue_id, int pid) {
 	for(conn_index = 0; i < MAX_LIST_SIZE; i++)
 		if(map[conn_index] != NULL && map[conn_index].pid == pid)
 			break;
-	
+
 	// Not found
 	if(pid_index >= MAX_LIST_SIZE)
 		return -1;
@@ -184,7 +184,7 @@ int leave_queue(int queue_id, int pid) {
 	q.pid_tail--;
 	return 0;
 }
-/* 
+/*
  * Destroys the queue with the given queue_id, unlocking
  * all locked processes.
  * TODO Unlock the locked processes
@@ -197,30 +197,6 @@ int destroy_queue(int queue_id) {
 	free(&queue_list[queue_id]);
 	queue_list[queue_id] = NULL;
 	return 0;
-}
-
-int lfsend(const void * msg, int size) {
-    return syscall(__NR_qqservice, LF_SEND, cp_msg, size);
-}
-
-int lfreceive(void * msg, int size) {
-    return syscall(__NR_qqservice, LF_RECEIVE, NULL, cp_msg_size);
-}
-
-/*
- * Attaches the current process to the named queue.
- * Returns the id of the queue the process was attached to.
- */
-int lfattach(const void *name) {
-    return syscall(__NR_qqservice_named_attach, cp_name, getpid());
-}
-
-int lfleave(int queue_id) {
-    return syscall(__NR_qqservice_named, LF_LEAVE, queue_id);
-}
-
-int lfdestroy(int queue_id) {
-    return syscall(__NR_qqservice_named, LF_DESTROY, queue_id);
 }
 
 
