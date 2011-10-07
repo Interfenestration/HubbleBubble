@@ -1,11 +1,7 @@
 #include <linux/module.h>
-#include <asm/uaccess.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
-
-#define __NR_qqservice 325
-#define __NR_qqservice_named 326
-#define __NR_qqservice_named_attach 327
+#include <asm/uaccess.h>
 
 #define MAX_LIST_SIZE 30
 #define LF_LEAVE 1
@@ -38,14 +34,72 @@ static void __exit qqmodule_exit(void) {
 int sys_qqmodule(int op, int queue_id, char* msg, int size) {
     switch(op) {
 	case LF_SEND:
-		return send_message(msg, size);
+		return send_message(queue_id, cmsg, size);
 	case LF_RECEIVE:
-		return receive_message(msg, size);
+		return receive_message(queue_id, msg, size);
 	}
 }
 
-int send_message(char* msg, int size) {
-	//TODO f9u12
+// CAS-ENQUEUE
+int send_message(int queue_id, char* msg, int size) {
+	int tail, x;
+	char * cp_msg = kmalloc(sizeof(char)*size, GFP_KERNEL); // might be sizeof(char *)
+	copy_from_user(cp_msg, msg, size);
+	Queue q = queue_list[queue_id];
+
+	do {
+		tail = q.messages_tail;
+		x = q.messages[tail % MAX_LIST_SIZE];
+		if(tail != q.messages_tail)
+			continue;
+		if(tail == q.messages_head + MAX_LIST_SIZE)
+			continue;
+		if(x == NULL) {
+			q.messages[tail % MAX_LIST_SIZE] = kmalloc(sizeof(char)*size, GFP_KERNEL);
+			if(cas(&q.messages[tail % MAX_LIST_SIZE], tail, (int) cp_msg)) {
+				cas(&q.messages_tail, tail, tail+1);
+				break;
+			}
+		} else {
+			cas(&q.messages_tail, tail, tail+1);
+		}
+	} while(true)
+
+	return 0;
+}
+
+// CAS-DEQUEUE - msg HAS TO BE INITIALIZED.
+int receive_message(int queue_id, char* msg, int size) {
+	int head, x;
+	Queue q = queue_list[queue_id];
+
+	do {
+		head = q.messages_head;
+		x = q.messages[head % MAX_LIST_SIZE];
+		if(head != q.messages_head)
+			continue;
+		if(head == q.messages_tail)
+			continue;
+		if(x != NULL) {
+			if(cas(&q.messages[head % MAX_LIST_SIZE], head, (int) NULL)) {
+				cas(&q.messages_head, head, head+1);
+				copy_to_user(msg, x, size); // Might give seg fault because of the CAS in the IF, not sure.
+				break;
+			}
+		} else {
+			cas(&q.messages_head, head, head+1);
+		}
+	} while(true)
+	return 0;
+}
+
+// old value e new value são endereços, dai inteiros.
+int cas(int* cell, int oldvalue, int newvalue) {
+	char result;
+	asm ("lock cmpxchg %2, (%1) ; setz %0"
+		: "=r" (result)
+		: "r" (cell), "r" (newvalue), "a" (oldvalue));
+	return result;
 }
 
 /*
@@ -161,6 +215,7 @@ Queue new_queue(char* name, pid_t pid) {
 		.pid_number = 1;
 		.messages_tail = 0;
 		.messages_head = 0;
+		.messages = kmalloc(sizeof(char*)*MAX_LIST_SIZE, GFP_KERNEL);
 	}
 	return q;
 }
@@ -171,6 +226,7 @@ int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
 		return leave_queue(queue_id, pid);
 	case LF_DESTROY:
 		return destroy_queue(queue_id);
+	}
 }
 
 /* Removes the given pid from the queue with the given queue_id */
@@ -196,7 +252,7 @@ int leave_queue(int queue_id, int pid) {
 		destroy_queue(queue_id);
 	else
 		queue_list[queue_id].pid_number -= 1;
-	
+
 	return 0;
 }
 

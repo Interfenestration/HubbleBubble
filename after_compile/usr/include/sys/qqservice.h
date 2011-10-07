@@ -7,7 +7,6 @@
 #define LF_SEND 1
 #define LF_RECEIVE 2
 
-
 #define lfsend(queue_id, msg, size) syscall(__NR_qqservice, LF_SEND, queue_id, msg, size);
 
 #define lfreceive(queue_id, msg, size) syscall(__NR_qqservice, LF_RECEIVE, queue_id, msg, size);
@@ -16,5 +15,4 @@
 
 #define lfleave(queue_id) syscall(__NR_qqservice_named, LF_LEAVE, queue_id, getpid());
 
-#define lfdestroy(queue_id) syscall(__NR_qqservice_named, LF_DESTROY, queue_id);
-
+#define lfdestroy(queue_id) syscall(__NR_qqservice_named, LF_DESTROY, queue_id, getpid());
