@@ -4,6 +4,7 @@
 #include <asm/uaccess.h>
 
 #define MAX_LIST_SIZE 30
+#define CONN_MAP_LIST_SIZE 400
 #define LF_LEAVE 1
 #define LF_DESTROY 2
 #define LF_SEND 1
@@ -20,7 +21,9 @@ struct Queue {
 struct Connection {
 	pid_t pid;
 	int queue_id;
-} map[MAX_LIST_SIZE] __init_data;
+} map[CONN_MAP_LIST_SIZE] __init_data;
+
+int free_map_slots __init_data = MAX_LIST_SIZE; 
 
 static int __init qqmodule_init(void) {
     printk("qqmodule init");
@@ -68,7 +71,7 @@ int send_message(int queue_id, char* msg, int size) {
 	return 0;
 }
 
-// CAS-DEQUEUE - msg HAS TO BE INITIALIZED.
+// CAS-DEQUEUE - msg HAS TO BE INITIALIZED ON THE USER SIDE.
 int receive_message(int queue_id, char* msg, int size) {
 	int head, x;
 	Queue q = queue_list[queue_id];
@@ -122,22 +125,12 @@ int sys_qqmodule_named_attach(char* name, pid_t pid) {
 	if(copy_from_user(kname, name, name_length) != 0)
 		return -1;
 
-	if(free_space() == 0)
+	if(free_map_slots == 0)
 		return -2;
 
 	queue_id = get_queue(kname, pid);
 	queue_attach(pid, queue_id);
     return queue_id;
-}
-
-/* Returns the free space in the Connection map */
-int free_space() {
-	int i;
-	int count = 0;
-	for(i = 0; i < MAX_LIST_SIZE; i++)
-		if(map[i] != null)
-			count++;
-	return count;
 }
 
 /* Attachs the given pid to the queue with the given queue_id. */
@@ -152,6 +145,7 @@ int queue_attach(pid_t pid, int queue_id) {
 		if(map[i] == NULL) {
 			map[i] = c;
 			q.pid_number += 1;
+			cas(&free_map_slots, free_map_slots, free_map_slots-1);
 		}
 	// TODO else what? fails? block?
 }
@@ -236,18 +230,20 @@ int leave_queue(int queue_id, int pid) {
 	if(queue_id > MAX_LIST_SIZE)
 		return -1;
 
-	for(conn_index = 0; i < MAX_LIST_SIZE; i++)
+	for(conn_index = 0; i < CONN_MAP_LIST_SIZE; i++)
 		if(map[conn_index] != NULL &&
 		   map[conn_index].pid == pid &&
 		   map[conn_index].queue_id == queue_id)
 			break;
 
 	// Not found
-	if(conn_index > MAX_LIST_SIZE)
+	if(conn_index > CONN_MAP_LIST_SIZE)
 		return -2;
 
 	// TODO insert thread-safeness
-	map[conn_index] = NULL;
+	cas(&map[conn_index], map[conn_index], NULL);
+	cas(&free_map_slots, free_map_slots, free_map_slots+1);
+
 	if(queue_list[queue_id].pid_number == 1)
 		destroy_queue(queue_id);
 	else
@@ -273,8 +269,10 @@ int destroy_queue(int queue_id) {
 	queue_list[queue_id] = NULL;
 
 	for(i = 0; i < MAX_LIST_SIZE; i++)
-		if(map[i].queue_id == queue_id)
+		if(map[i].queue_id == queue_id) {
 			map[i] = NULL;
+			cas(&free_map_slots, free_map_slots, free_map_slots-1);
+		}
 	return 0;
 }
 
