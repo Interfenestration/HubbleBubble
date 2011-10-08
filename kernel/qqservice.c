@@ -4,7 +4,7 @@
 
 int (* sys_qqmodule)(int, int, char *, int);
 int (* sys_qqmodule_named_attach) (char *, pid_t);
-int (* sys_qqmodule_named) (int, char *, pid_t);
+int (* sys_qqmodule_named) (int, int, pid_t);
 
 EXPORT_SYMBOL(sys_qqmodule);
 EXPORT_SYMBOL(sys_qqmodule_named_attach);
