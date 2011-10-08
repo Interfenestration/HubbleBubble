@@ -63,7 +63,7 @@ int send_message(int queue_id, char* msg, int size) {
 			continue;
 		if(x == NULL) {
 			q.messages[tail % MAX_LIST_SIZE] = kmalloc(sizeof(char)*size, GFP_KERNEL);
-			if(cas(&q.messages[tail % MAX_LIST_SIZE], tail, (int) cp_msg)) {
+			if(cas(&q.messages[tail % MAX_LIST_SIZE], NULL, (int) cp_msg)) {
 				cas(&q.messages_tail, tail, tail+1);
 				break;
 			}
@@ -91,7 +91,7 @@ int receive_message(int queue_id, char* msg, int size) {
 		if(head == q.messages_tail)
 			continue;
 		if(x != NULL) {
-			if(cas(&q.messages[head % MAX_LIST_SIZE], head, (int) NULL)) {
+			if(cas(&q.messages[head % MAX_LIST_SIZE], x, (int) NULL)) {
 				cas(&q.messages_head, head, head+1);
 				copy_to_user(msg, x, size);
 				break;
