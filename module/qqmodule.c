@@ -12,6 +12,8 @@
 #define LF_SEND 1
 #define LF_RECEIVE 2
 
+wait_queue_head_t wait_queue;
+
 struct Queue {
     char * name;
     int pid_number;
@@ -28,12 +30,14 @@ struct Connection {
 int free_map_slots __init_data = CONN_MAP_LIST_SIZE; 
 
 static int __init qqmodule_init(void) {
+	DECLARE_WAIT_QUEUE_HEAD(wait_queue);
     printk("qqmodule init");
     return 0;
 }
 
 static void __exit qqmodule_exit(void) {
     printk("qqmodule exited");
+    // TODO Free ALL THE THINGS
 }
 
 int sys_qqmodule(int op, int queue_id, char* msg, int size) {
@@ -59,12 +63,15 @@ int send_message(int queue_id, char* msg, int size) {
 		x = q.messages[tail % MAX_LIST_SIZE];
 		if(tail != q.messages_tail)
 			continue;
-		if(tail == q.messages_head + MAX_LIST_SIZE)
+		if(tail == q.messages_head + MAX_LIST_SIZE) {
+			wait_event(&wait_queue, (tail != q.messages_head + MAX_LIST_SIZE));
 			continue;
+		}
 		if(x == NULL) {
 			q.messages[tail % MAX_LIST_SIZE] = kmalloc(sizeof(char)*size, GFP_KERNEL);
 			if(cas(&q.messages[tail % MAX_LIST_SIZE], NULL, (int) cp_msg)) {
 				cas(&q.messages_tail, tail, tail+1);
+				wake_up(&wait_queue);
 				break;
 			}
 		} else {
@@ -88,13 +95,16 @@ int receive_message(int queue_id, char* msg, int size) {
 		x = q.messages[head % MAX_LIST_SIZE];
 		if(head != q.messages_head)
 			continue;
-		if(head == q.messages_tail)
+		if(head == q.messages_tail) {
+			wait_event(&wait_queue, (q.messages_head != q.messages_tail));
 			continue;
+		}
 		if(x != NULL) {
 			if(cas(&q.messages[head % MAX_LIST_SIZE], x, (int) NULL)) {
 				cas(&q.messages_head, head, head+1);
 				copy_to_user(msg, x, size);
 				kfree(x);
+				wake_up(&wait_queue);
 				break;
 			}
 		} else {
