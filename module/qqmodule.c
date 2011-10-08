@@ -39,7 +39,7 @@ static void __exit qqmodule_exit(void) {
 int sys_qqmodule(int op, int queue_id, char* msg, int size) {
     switch(op) {
 	case LF_SEND:
-		return send_message(queue_id, cmsg, size);
+		return send_message(queue_id, msg, size);
 	case LF_RECEIVE:
 		return receive_message(queue_id, msg, size);
 	}
@@ -94,6 +94,7 @@ int receive_message(int queue_id, char* msg, int size) {
 			if(cas(&q.messages[head % MAX_LIST_SIZE], x, (int) NULL)) {
 				cas(&q.messages_head, head, head+1);
 				copy_to_user(msg, x, size);
+				kfree(x);
 				break;
 			}
 		} else {
@@ -123,7 +124,7 @@ int sys_qqmodule_named_attach(char* name, pid_t pid) {
 	int name_length;
 	int queue_id;
 
-	if(name == NULL )
+	if(name == NULL)
 		return -1;
 
 	name_length = strlen(name);
