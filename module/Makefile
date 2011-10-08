@@ -3,7 +3,7 @@ MAKE=make
 PWD=$(shell pwd)
 
 obj-m := qqmodule.o
-module-objs := qqmodule.o qqueue.o
+module-objs := qqmodule.o
 
 all:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
