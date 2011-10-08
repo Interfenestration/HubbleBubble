@@ -261,6 +261,9 @@ int leave_queue(int queue_id, int pid) {
 		   map[conn_index].pid == pid &&
 		   map[conn_index].queue_id == queue_id) {
 		   	hasFound=1;
+		   	if(cas(&map[conn_index], map[conn_index], NULL))
+		   		cas(&free_map_slots, free_map_slots, free_map_slots+1);
+)
 			break;
 		}
 
@@ -268,10 +271,7 @@ int leave_queue(int queue_id, int pid) {
 	if(hasFound == 0)
 		return -2;
 
-	cas(&map[conn_index], map[conn_index], NULL);
-	cas(&free_map_slots, free_map_slots, free_map_slots+1);
-
-	if(queue_list[queue_id].pid_number == 1)
+	if(queue_list[queue_id].pid_number == 1) // Vai ter de ser mudado provavelmente
 		destroy_queue(queue_id);
 	else
 		queue_list[queue_id].pid_number -= 1;
@@ -292,7 +292,7 @@ int destroy_queue(int queue_id) {
 //	Something like this for the process unlocking (+thread-safety)
 //	for(int i = 0; i < q.pid_tail; i++)
 //		unlock(q.pid_list[i])
-	
+
 	if(cas(&queue_list[queue_id], queue_list[queue_id], NULL)) {
 		kfree(&q);
 		for(i = 0; i < MAX_LIST_SIZE; i++) {
