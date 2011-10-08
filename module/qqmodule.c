@@ -1,6 +1,8 @@
 #include <linux/module.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 
 #define MAX_LIST_SIZE 30
@@ -23,7 +25,7 @@ struct Connection {
 	int queue_id;
 } map[CONN_MAP_LIST_SIZE] __init_data;
 
-int free_map_slots __init_data = MAX_LIST_SIZE; 
+int free_map_slots __init_data = CONN_MAP_LIST_SIZE; 
 
 static int __init qqmodule_init(void) {
     printk("qqmodule init");
@@ -43,7 +45,9 @@ int sys_qqmodule(int op, int queue_id, char* msg, int size) {
 	}
 }
 
-// CAS-ENQUEUE
+/* CAS-ENQUEUE
+ * Sends a message to queue_id.
+ */
 int send_message(int queue_id, char* msg, int size) {
 	int tail, x;
 	char * cp_msg = kmalloc(sizeof(char)*size, GFP_KERNEL); // might be sizeof(char *)
@@ -71,7 +75,10 @@ int send_message(int queue_id, char* msg, int size) {
 	return 0;
 }
 
-// CAS-DEQUEUE - msg HAS TO BE INITIALIZED ON THE USER SIDE.
+/* CAS-DEQUEUE
+ * Retrieves a message from queue_id.
+ * Pre-Condition - msg must be malloc'd (user side).
+ */
 int receive_message(int queue_id, char* msg, int size) {
 	int head, x;
 	Queue q = queue_list[queue_id];
@@ -86,7 +93,7 @@ int receive_message(int queue_id, char* msg, int size) {
 		if(x != NULL) {
 			if(cas(&q.messages[head % MAX_LIST_SIZE], head, (int) NULL)) {
 				cas(&q.messages_head, head, head+1);
-				copy_to_user(msg, x, size); // Might give seg fault because of the CAS in the IF, not sure.
+				copy_to_user(msg, x, size);
 				break;
 			}
 		} else {
@@ -120,7 +127,7 @@ int sys_qqmodule_named_attach(char* name, pid_t pid) {
 		return -1;
 
 	name_length = strlen(name);
-	kname = kmalloc(sizeof(char) * name_length);
+	kname = kmalloc(sizeof(char) * name_length, GFP_KERNEL);
 	// Returns 0 (false) if it was successfull (yeah, it confuses me too)
 	if(copy_from_user(kname, name, name_length) != 0)
 		return -1;
@@ -138,16 +145,23 @@ int queue_attach(pid_t pid, int queue_id) {
 	Connection c;
 	Queue q;
 	int i;
+	int hasChanged = 0;
 	c = create_connection(pid, queue_id);
 	q = queue_list[queue_id];
 
-	for(i = 0; i < MAX_LIST_SIZE; i++)
+	for(i = 0; i < MAX_LIST_SIZE; i++) {
 		if(map[i] == NULL) {
-			map[i] = c;
-			q.pid_number += 1;
-			cas(&free_map_slots, free_map_slots, free_map_slots-1);
+			if(cas(&map[i], NULL, c)) {
+				cas(&q.pid_number, q.pid_number, q.pid_number+1);
+				cas(&free_map_slots, free_map_slots, free_map_slots-1);
+				hasChanged = 1;
+			} else
+				continue; // Caso não consiga trocar o map[i] continua o loop até encontrar outro null.
 		}
-	// TODO else what? fails? block?
+	}
+	if(hasChanged == 0)
+		return -1; // Failed.
+	return 0;
 }
 
 Connection create_connection(pid_t pid, int queue_id) {
@@ -181,7 +195,6 @@ int get_queue(char* name, pid_t pid) {
  * If the operation is successful returns the position. If not
  * returns a negative value.
  * Pre-condition: There is no previously created queue with this name.
- * TODO Make this thread-safe
  */
 int create_queue(char* name, pid_t pid) {
 	Queue q;
@@ -191,9 +204,10 @@ int create_queue(char* name, pid_t pid) {
 
 	for(i = 0; i < MAX_LIST_SIZE; i++) {
 		if(queue_list[i] == NULL) {
-			// TODO thread-safeness here
-			queue_list[i] = q;
-			return i;
+			if(cas(&queue_list[i], NULL, q))
+				return i;
+			else
+				continue;
 		}
 	}
 	return -1;
@@ -226,21 +240,23 @@ int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
 /* Removes the given pid from the queue with the given queue_id */
 int leave_queue(int queue_id, int pid) {
 	int conn_index;
+	int hadFound = 0;
 
-	if(queue_id > MAX_LIST_SIZE)
+	if(queue_id >= MAX_LIST_SIZE)
 		return -1;
 
 	for(conn_index = 0; i < CONN_MAP_LIST_SIZE; i++)
 		if(map[conn_index] != NULL &&
 		   map[conn_index].pid == pid &&
-		   map[conn_index].queue_id == queue_id)
+		   map[conn_index].queue_id == queue_id) {
+		   	hasFound=1;
 			break;
+		}
 
 	// Not found
-	if(conn_index > CONN_MAP_LIST_SIZE)
+	if(hasFound == 0)
 		return -2;
 
-	// TODO insert thread-safeness
 	cas(&map[conn_index], map[conn_index], NULL);
 	cas(&free_map_slots, free_map_slots, free_map_slots+1);
 
@@ -261,18 +277,21 @@ int destroy_queue(int queue_id) {
 	int i;
 	Queue q;
 
-	q = list_queue[queue_id];
+	q = queue_list[queue_id];
 //	Something like this for the process unlocking (+thread-safety)
 //	for(int i = 0; i < q.pid_tail; i++)
 //		unlock(q.pid_list[i])
-	free(&queue_list[queue_id]);
-	queue_list[queue_id] = NULL;
-
-	for(i = 0; i < MAX_LIST_SIZE; i++)
-		if(map[i].queue_id == queue_id) {
-			map[i] = NULL;
-			cas(&free_map_slots, free_map_slots, free_map_slots-1);
+	
+	if(cas(&queue_list[queue_id], queue_list[queue_id], NULL)) {
+		kfree(&q);
+		for(i = 0; i < MAX_LIST_SIZE; i++) {
+			if(map[i].queue_id == queue_id) {
+				if(cas(&map[i], map[i], NULL))
+					cas(&free_map_slots, free_map_slots, free_map_slots+1);
+			}
 		}
+	} else
+		return -1;
 	return 0;
 }
 
