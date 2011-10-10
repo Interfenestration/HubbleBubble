@@ -4,6 +4,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
+MODULE_LICENSE("GPL");
 
 #define MAX_LIST_SIZE 30
 #define CONN_MAP_LIST_SIZE 400
@@ -12,32 +13,38 @@
 #define LF_SEND 1
 #define LF_RECEIVE 2
 
-
 typedef struct {
     char * name;
     int pid_number;
     int tail;
     int head;
+    int messages_size[MAX_LIST_SIZE];
     char * messages[MAX_LIST_SIZE];
     wait_queue_head_t wait_queue;
 } Queue;
 
-Queue * queue_list[MAX_LIST_SIZE] __initdata;
+static Queue * queue_list[MAX_LIST_SIZE];
 
 typedef struct {
 	pid_t pid;
 	int queue_id;
 } Connection;
 
-Connection * map[CONN_MAP_LIST_SIZE] __initdata;
+static Connection * map[CONN_MAP_LIST_SIZE];
 
-int free_map_slots __initdata = CONN_MAP_LIST_SIZE; 
+static int free_map_slots __initdata = CONN_MAP_LIST_SIZE; 
 
-int destroy_queue(int queue_id);
+static int destroy_queue(int queue_id);
 
 static int __init qqmodule_init(void) {
-	DECLARE_WAIT_QUEUE_HEAD(wait_queue);
-    printk("qqmodule init");
+	int i; 
+
+	for(i = 0; i < MAX_LIST_SIZE; i++)
+		queue_list[i] = NULL;
+	for(i = 0; i < CONN_MAP_LIST_SIZE; i++)
+		map[i] = NULL;
+
+    printk("qqmodule init\n");
     return 0;
 }
 
@@ -46,15 +53,16 @@ static void __exit qqmodule_exit(void) {
 
 	for(i = 0; i < MAX_LIST_SIZE; i++) {
 		if(queue_list[i] != NULL) {
+			printk("qqmodule Destroying queue %d\n", i);
 			destroy_queue(i);
 		}
 	}
 
-    printk("qqmodule exited");
+    printk("qqmodule exited\n");
 }
 
 // old value e new value são endereços, dai inteiros.
-int cas(int* cell, int oldvalue, int newvalue) {
+static int cas(int* cell, int oldvalue, int newvalue) {
 	char result;
 
 	asm ("lock cmpxchg %2, (%1) ; setz %0"
@@ -66,7 +74,7 @@ int cas(int* cell, int oldvalue, int newvalue) {
 /* CAS-ENQUEUE
  * Sends a message to queue_id.
  */
-int send_message(int queue_id, char * msg, int size) {
+static int send_message(int queue_id, char * msg, int size) {
 	int tail;
 	char * x;
 	char * cp_msg;
@@ -88,6 +96,7 @@ int send_message(int queue_id, char * msg, int size) {
 		if(x == NULL) {
 			q->messages[tail % MAX_LIST_SIZE] = kmalloc(sizeof(char) * size, GFP_KERNEL);
 			if(cas((int *) q->messages[tail % MAX_LIST_SIZE], (int) NULL, (int) cp_msg)) {
+				cas(&q->messages_size[tail % MAX_LIST_SIZE], 0, size);
 				cas(&q->tail, tail, tail+1);
 				wake_up(&(q->wait_queue));
 				break;
@@ -104,10 +113,11 @@ int send_message(int queue_id, char * msg, int size) {
  * Retrieves a message from queue_id.
  * Pre-Condition - msg must be malloc'd (user side).
  */
-int receive_message(int queue_id, char * msg, int size) {
+static int receive_message(int queue_id, char * msg, int size) {
 	int head;
 	char * x;
 	Queue * q;
+	int size_to_retrieve;	
 	
 	q = queue_list[queue_id];
 
@@ -117,14 +127,22 @@ int receive_message(int queue_id, char * msg, int size) {
 		if(head != q->head)
 			continue;
 		if(head == q->tail) {
-			wait_event(wait_queue, (q->head != q->tail));
+			wait_event(q->wait_queue, (q->head != q->tail));
 			continue;
 		}
 		if(x != NULL) {
 			if(cas((int *) q->messages[head % MAX_LIST_SIZE], (int) x, (int) NULL)) {
 				cas(&q->head, head, head+1);
-				copy_to_user(msg, x, size);
+
+				if(size > q->messages_size[head % MAX_LIST_SIZE])
+					size_to_retrieve = q->messages_size[head % MAX_LIST_SIZE];
+				else
+					size_to_retrieve = size;
+
+				copy_to_user(msg, x, size_to_retrieve);
 				kfree(x);
+
+				cas(&q->messages_size[head % MAX_LIST_SIZE], q->messages_size[head % MAX_LIST_SIZE], 0);
 				wake_up(&(q->wait_queue));
 				break;
 			}
@@ -136,7 +154,7 @@ int receive_message(int queue_id, char * msg, int size) {
 	return 0;
 }
 
-int sys_qqmodule(int op, int queue_id, char* msg, int size) {
+static int sys_qqmodule(int op, int queue_id, char* msg, int size) {
     switch(op) {
 	case LF_SEND:
 		return send_message(queue_id, msg, size);
@@ -149,13 +167,13 @@ int sys_qqmodule(int op, int queue_id, char* msg, int size) {
 /*
  * Creates, inits and returns a queue struct with the given name.
  */
-Queue * new_queue(char * name, pid_t pid) {
+static Queue * new_queue(char * name, pid_t pid) {
 	Queue * q = kmalloc(sizeof(Queue), GFP_KERNEL);
 	q->name = name;
 	q->pid_number = 1;
 	q->tail = 0;
 	q->head = 0;
-	init_waitqueue_head(&(q->wait_queue);
+	init_waitqueue_head(&(q->wait_queue));
 
 	return q;
 }
@@ -166,7 +184,7 @@ Queue * new_queue(char * name, pid_t pid) {
  * returns a negative value.
  * Pre-condition: There is no previously created queue with this name.
  */
-int create_queue(char * name, pid_t pid) {
+static int create_queue(char * name, pid_t pid) {
 	Queue * q;
 	int i;
 
@@ -188,7 +206,7 @@ int create_queue(char * name, pid_t pid) {
  * If it exists, it simply returns its index. If not, it creates
  * a new one, adds it to the array and returns its index.
  */
-int get_queue(char * name, pid_t pid) {
+static int get_queue(char * name, pid_t pid) {
 	Queue * current_queue;
 	int i;
 
@@ -202,7 +220,7 @@ int get_queue(char * name, pid_t pid) {
 	return create_queue(name, pid);
 }
 
-Connection * create_connection(pid_t pid, int queue_id) {
+static Connection * create_connection(pid_t pid, int queue_id) {
 	Connection * c = kmalloc(sizeof(Connection), GFP_KERNEL);
 	c->pid = pid;
 	c->queue_id = queue_id;
@@ -211,7 +229,7 @@ Connection * create_connection(pid_t pid, int queue_id) {
 }
 
 /* Attachs the given pid to the queue with the given queue_id. */
-int queue_attach(pid_t pid, int queue_id) {
+static int queue_attach(pid_t pid, int queue_id) {
 	Connection * c;
 	Queue * q;
 	int i;
@@ -241,7 +259,7 @@ int queue_attach(pid_t pid, int queue_id) {
  * If everything goes well, returns a non-negative int representing
  * the queue_id, else returns a negative int.
  */
-int sys_qqmodule_named_attach(char * name, pid_t pid) {
+static int sys_qqmodule_named_attach(char * name, pid_t pid) {
 	char * kname;
 	int name_length;
 	int queue_id;
@@ -268,7 +286,7 @@ int sys_qqmodule_named_attach(char * name, pid_t pid) {
  * all locked processes.
  * TODO Unlock the locked processes
  */
-int destroy_queue(int queue_id) {
+static int destroy_queue(int queue_id) {
 	int i;
 	Queue * q;
 	Connection * c;
@@ -278,7 +296,7 @@ int destroy_queue(int queue_id) {
 //	for(int i = 0; i < q.pid_tail; i++)
 //		unlock(q.pid_list[i])
 
-	if(cas((int *) &queue_list[queue_id], (int) &queue_list[queue_id], (int) NULL)) {
+	if(cas((int *) queue_list[queue_id], (int) queue_list[queue_id], (int) NULL)) {
 		kfree(q);
 		for(i = 0; i < MAX_LIST_SIZE; i++) {
 			if(map[i]->queue_id == queue_id) {
@@ -295,7 +313,7 @@ int destroy_queue(int queue_id) {
 }
 
 /* Removes the given pid from the queue with the given queue_id */
-int leave_queue(int queue_id, int pid) {
+static int leave_queue(int queue_id, int pid) {
 	int conn_index;
 	int hasFound;
 	Connection * c;
@@ -331,7 +349,7 @@ int leave_queue(int queue_id, int pid) {
 	return 0;
 }
 
-int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
+static int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
 	switch(op) {
 	case LF_LEAVE:
 		return leave_queue(queue_id, pid);
