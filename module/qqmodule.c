@@ -6,6 +6,7 @@
 #include <asm/uaccess.h>
 MODULE_LICENSE("GPL");
 
+
 #define LIST_SIZE 30
 #define MAP_SIZE 400
 #define LF_LEAVE 1
@@ -32,36 +33,15 @@ typedef struct {
 	int queue_id;
 } Connection;
 
+extern int (* sys_qqmodule) (int, int, char *, int);
+extern int (* sys_qqmodule_named_attach) (char *, pid_t);
+extern int (* sys_qqmodule_named) (int, int, pid_t);
+
 static Connection * map[MAP_SIZE];
 
 static int free_map_slots __initdata = MAP_SIZE; 
 
 static int destroy_queue(int queue_id);
-
-static int __init qqmodule_init(void) {
-	int i; 
-
-	for(i = 0; i < LIST_SIZE; i++)
-		queue_list[i] = NULL;
-	for(i = 0; i < MAP_SIZE; i++)
-		map[i] = NULL;
-
-    printk("qqmodule init\n");
-    return 0;
-}
-
-static void __exit qqmodule_exit(void) {
-	int i;
-
-	for(i = 0; i < LIST_SIZE; i++) {
-		if(queue_list[i] != NULL) {
-			printk("qqmodule Destroying queue %d\n", i);
-			destroy_queue(i);
-		}
-	}
-
-    printk("qqmodule exited\n");
-}
 
 // old value e new value são endereços, dai inteiros.
 static int cas(int* cell, int oldvalue, int newvalue) {
@@ -156,7 +136,7 @@ static int receive_message(int queue_id, char * msg, int size) {
 	return 0;
 }
 
-static int sys_qqmodule(int op, int queue_id, char* msg, int size) {
+int sys_qqmodule_impl(int op, int queue_id, char* msg, int size) {
     switch(op) {
 	case LF_SEND:
 		return send_message(queue_id, msg, size);
@@ -200,7 +180,7 @@ static int create_queue(char * name, pid_t pid) {
 				continue;
 		}
 	}
-	return -1;
+	return -2;
 }
 
 /*
@@ -251,7 +231,7 @@ static int queue_attach(pid_t pid, int queue_id) {
 		}
 	}
 	if(hasChanged == 0)
-		return -1; // Failed.
+		return -2; // Failed.
 	return 0;
 }
 
@@ -261,7 +241,7 @@ static int queue_attach(pid_t pid, int queue_id) {
  * If everything goes well, returns a non-negative int representing
  * the queue_id, else returns a negative int.
  */
-static int sys_qqmodule_named_attach(char * name, pid_t pid) {
+int sys_qqmodule_named_attach_impl(char * name, pid_t pid) {
 	char * kname;
 	int name_length;
 	int queue_id;
@@ -274,20 +254,19 @@ static int sys_qqmodule_named_attach(char * name, pid_t pid) {
 	kname = kmalloc(sizeof(char) * name_length, GFP_KERNEL);
 	// Returns 0 (false) if it was successfull (yeah, it confuses me too)
 	if(copy_from_user(kname, name, name_length) != 0)
-		return -1;
+		return -2;
 
 	if(free_map_slots == 0)
-		return -2; // No free map slots
-	
+		return -3; // No free map slots
+
+	queue_id = get_queue(kname, pid);
+
 	for(i = 0; i < MAP_SIZE; i++) {
-		if(map[i] != NULL &&
-		   map[i]->pid == pid &&
-		   map[i]->queue_id == queue_id) {
-		   return -3; // Already attached
+		if(map[i] != NULL && map[i]->pid == pid && map[i]->queue_id == queue_id) {
+		   return -4; // Already attached
 		}
 	}
 
-	queue_id = get_queue(kname, pid);
 	queue_attach(pid, queue_id);
     return queue_id;
 }
@@ -325,7 +304,7 @@ static int destroy_queue(int queue_id) {
 		}
 	} else {
 		up(&lfdestroy_mutex);
-		return -1;
+		return -3;
 	}
 
 	up(&lfdestroy_mutex);
@@ -341,7 +320,7 @@ static int leave_queue(int queue_id, int pid) {
 	hasFound = 0;
 
 	if(queue_id >= LIST_SIZE)
-		return -1;
+		return -2;
 
 	for(conn_index = 0; conn_index < MAP_SIZE; conn_index++) {
 		if(map[conn_index] != NULL &&
@@ -359,7 +338,7 @@ static int leave_queue(int queue_id, int pid) {
 
 	// Not found
 	if(hasFound == 0)
-		return -2;
+		return -3;
 
 	if(queue_list[queue_id]->pid_number == 1) // Vai ter de ser mudado provavelmente
 		destroy_queue(queue_id);
@@ -369,7 +348,7 @@ static int leave_queue(int queue_id, int pid) {
 	return 0;
 }
 
-static int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
+int sys_qqmodule_named_impl(int op, int queue_id, pid_t pid) {
 	switch(op) {
 	case LF_LEAVE:
 		return leave_queue(queue_id, pid);
@@ -379,6 +358,38 @@ static int sys_qqmodule_named(int op, int queue_id, pid_t pid) {
 	return -5; // Unsupported OP
 }
 
+static int __init qqmodule_init(void) {
+	int i;
+
+	sys_qqmodule = &sys_qqmodule_impl;
+	sys_qqmodule_named = &sys_qqmodule_named_impl;
+	sys_qqmodule_named_attach = &sys_qqmodule_named_attach_impl;
+	
+	for(i = 0; i < LIST_SIZE; i++)
+		queue_list[i] = NULL;
+	for(i = 0; i < MAP_SIZE; i++)
+		map[i] = NULL;
+
+    printk("qqmodule init\n");
+    return 0;
+}
+
+static void __exit qqmodule_exit(void) {
+	int i;
+
+	sys_qqmodule = 0;
+	sys_qqmodule_named = 0;
+	sys_qqmodule_named_attach = 0;
+
+	for(i = 0; i < LIST_SIZE; i++) {
+		if(queue_list[i] != NULL) {
+			printk("qqmodule Destroying queue %d\n", i);
+			destroy_queue(i);
+		}
+	}
+
+    printk("qqmodule exited\n");
+}
 
 module_init(qqmodule_init);
 module_exit(qqmodule_exit);

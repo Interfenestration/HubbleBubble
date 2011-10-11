@@ -1,3 +1,6 @@
+#include <unistd.h>
+#include <sys/syscall.h>
+
 #define __NR_qqservice 325
 #define __NR_qqservice_named 326
 #define __NR_qqservice_named_attach 327

@@ -457,7 +457,7 @@ int simpleTest() {
 	queue_id = lfattach("stuff");
 
 	printf("Simple Test Started\n");
-	if(queue_id != -1) {
+	if(queue_id >= 0) {
 		lfsend(queue_id, "stuff", 6);
 		printf("Sent message to %d\n", queue_id);
 
@@ -467,7 +467,7 @@ int simpleTest() {
 
 		lfdestroy(queue_id);
 	} else {
-		printf("Failed to attach.\n");
+		printf("Failed to attach.Error code: %d\n", queue_id);
 	}
 	printf("Simple Test Ended\n\n");
 
