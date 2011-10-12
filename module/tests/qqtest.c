@@ -11,7 +11,6 @@ int joinLeaveTest();
 int pluralTest();
 int boundsTest();
 int simpleTest();
-void println(char*);
 
 int main(int argc, char * argv[]) {
 	//simpleTest();
@@ -20,6 +19,7 @@ int main(int argc, char * argv[]) {
 	//forkItTwice();
 	//pluralTest();
 	//boundsTest();
+
 	return 0;
 }
 
@@ -50,9 +50,9 @@ int forkItTwice() {
 		success = fork();
 		if(success == 0) { // Child
 			queue_id = lfattach(queue_name, strlen(queue_name));
-			lfsend(queue_id, msgs[0], 50);
-			lfsend(queue_id, msgs[1], 50);
-			lfsend(queue_id, msgs[2], 50);
+			lfsend(queue_id, msgs[0], strlen(msgs[0]));
+			lfsend(queue_id, msgs[1], strlen(msgs[1]));
+			lfsend(queue_id, msgs[2], strlen(msgs[2]));
 			while(messages_received < messages_wanted) {
 				lfreceive(queue_id, received, 50);
 				if(for_me(received, 'c')) {
@@ -68,9 +68,9 @@ int forkItTwice() {
 		}
 		else { // Still Parent
 			queue_id = lfattach(queue_name, strlen(queue_name));
-			lfsend(queue_id, msgs[3], 50);
-			lfsend(queue_id, msgs[4], 50);
-			lfsend(queue_id, msgs[5], 50);
+			lfsend(queue_id, msgs[3], strlen(msgs[3]));
+			lfsend(queue_id, msgs[4], strlen(msgs[4]));
+			lfsend(queue_id, msgs[5], strlen(msgs[5]));
 			while(messages_received < messages_wanted) {
 				lfreceive(queue_id, received, 50);
 				if(for_me(received, 'p')) {
@@ -87,9 +87,9 @@ int forkItTwice() {
 	}
 	else { // Grandparent
 		queue_id = lfattach(queue_name, strlen(queue_name));
-			lfsend(queue_id, msgs[6], 50);
-			lfsend(queue_id, msgs[7], 50);
-			lfsend(queue_id, msgs[8], 50);
+			lfsend(queue_id, msgs[6], strlen(msgs[6]));
+			lfsend(queue_id, msgs[7], strlen(msgs[7]));
+			lfsend(queue_id, msgs[8], strlen(msgs[8]));
 			while(messages_received < messages_wanted) {
 				lfreceive(queue_id, received, 50);
 				if(for_me(received, 'g')) {
@@ -145,10 +145,10 @@ int forkItOnce() {
 	} else if(success == 0) { // Son
 		childRead_parentWrite = lfattach(crpw, strlen(crpw));
 		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
-		lfsend(childWrite_parentRead, son1, strlen(son1) + 1);
+		lfsend(childWrite_parentRead, son1, strlen(son1));
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father1
-		lfsend(childWrite_parentRead, son2, strlen(son2) + 1);
+		lfsend(childWrite_parentRead, son2, strlen(son2));
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father21
 		lfreceive(childRead_parentWrite, receive, 100);
@@ -157,7 +157,7 @@ int forkItOnce() {
 		printf("Parent said: %s\n", receive); // father23
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father24
-		lfsend(childWrite_parentRead, son3, strlen(son3) + 1);
+		lfsend(childWrite_parentRead, son3, strlen(son3));
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father31
 		lfreceive(childRead_parentWrite, receive, 100);
@@ -166,10 +166,10 @@ int forkItOnce() {
 		printf("Parent said: %s\n", receive); // father33
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father34
-		lfsend(childWrite_parentRead, son4, strlen(son4) + 1);
+		lfsend(childWrite_parentRead, son4, strlen(son4));
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father4
-		lfsend(childWrite_parentRead, son5, strlen(son5) + 1);
+		lfsend(childWrite_parentRead, son5, strlen(son5));
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father5
 		lfleave(childRead_parentWrite);
@@ -269,25 +269,25 @@ int joinLeaveTest() {
 	success = (queue_ids[9] >= 0);
 	printf("[%d] Queue Attach\n", success);
 
-	success = lfsend(queue_ids[0], "0", 1);
+	success = lfsend(queue_ids[0], "0", strlen("0"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[1], "1", 1);
+	success = lfsend(queue_ids[1], "1", strlen("1"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[2], "2", 1);
+	success = lfsend(queue_ids[2], "2", strlen("2"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[3], "3", 1);
+	success = lfsend(queue_ids[3], "3", strlen("3"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[4], "4", 1);
+	success = lfsend(queue_ids[4], "4", strlen("4"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[5], "5", 1);
+	success = lfsend(queue_ids[5], "5", strlen("5"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[6], "6", 1);
+	success = lfsend(queue_ids[6], "6", strlen("6"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[7], "7", 1);
+	success = lfsend(queue_ids[7], "7", strlen("7"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[8], "8", 1);
+	success = lfsend(queue_ids[8], "8", strlen("8"));
 	printf("[%d] Message Send\n", success);
-	success = lfsend(queue_ids[9], "9", 1);
+	success = lfsend(queue_ids[9], "9", strlen("9"));
 	printf("[%d] Message Send\n", success);
 
 	success = lfleave(queue_ids[0]);
@@ -311,25 +311,25 @@ int joinLeaveTest() {
 	success = lfleave(queue_ids[9]);
 	printf("[%d] Queue Leave\n", success);
 
-	success = lfsend(queue_ids[0], "0", 1);
+	success = lfsend(queue_ids[0], "0", strlen("0"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[1], "1", 1);
+	success = lfsend(queue_ids[1], "1", strlen("1"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[2], "2", 1);
+	success = lfsend(queue_ids[2], "2", strlen("2"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[3], "3", 1);
+	success = lfsend(queue_ids[3], "3", strlen("3"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[4], "4", 1);
+	success = lfsend(queue_ids[4], "4", strlen("4"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[5], "5", 1);
+	success = lfsend(queue_ids[5], "5", strlen("5"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[6], "6", 1);
+	success = lfsend(queue_ids[6], "6", strlen("6"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[7], "7", 1);
+	success = lfsend(queue_ids[7], "7", strlen("7"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[8], "8", 1);
+	success = lfsend(queue_ids[8], "8", strlen("8"));
 	printf("[%d] Queue Send Fail\n", !success);
-	success = lfsend(queue_ids[9], "9", 1);
+	success = lfsend(queue_ids[9], "9", strlen("9"));
 	printf("[%d] Queue Send Fail\n", !success);
 
 	return 0;
@@ -346,17 +346,17 @@ int pluralTest() {
 	q2 = lfattach("dos", strlen("dos"));
 	q3 = lfattach("tres", strlen("tres"));
 
-	println("Plural Test Started");
+	printf("Plural Test Started\n");
 	if(q1 >= 0 && q2 >= 0 && q3 >= 0) {
-		lfsend(q1, msg1, 8);
-		lfsend(q2, msg2, 12);
-		lfsend(q3, msg3, 13);
-		lfsend(q1, msg2, 12);
-		lfsend(q2, msg3, 13);
-		lfsend(q3, msg1, 8);
-		lfsend(q1, msg3, 13);
-		lfsend(q2, msg1, 8);
-		lfsend(q3, msg2, 12);
+		lfsend(q1, msg1, strlen(msg1));
+		lfsend(q2, msg2, strlen(msg2));
+		lfsend(q3, msg3, strlen(msg3));
+		lfsend(q1, msg2, strlen(msg2));
+		lfsend(q2, msg3, strlen(msg3));
+		lfsend(q3, msg1, strlen(msg1));
+		lfsend(q1, msg3, strlen(msg3));
+		lfsend(q2, msg1, strlen(msg1));
+		lfsend(q3, msg2, strlen(msg2));
 
 		// From queue 1
 		lfreceive(q1, rcv, 8);
@@ -412,11 +412,11 @@ int boundsTest() {
 	rcv = malloc(sizeof(char) * 8);
 	queue_id = lfattach("stuff", strlen("stuff"));
 
-	println("Bound Test Start\n");
+	printf("Bound Test Start\n");
 	if(queue_id >= 0) {
 		// Write 8, Read 4
 		printf("\nWrite 8 - Read 4\n");
-		success = lfsend(queue_id, msg, 8);
+		success = lfsend(queue_id, msg, strlen(msg));
 		printf("[%d] Send 8-char message\n", success);
 
 		success = lfreceive(queue_id, rcv, 4);
@@ -427,7 +427,7 @@ int boundsTest() {
 
 		// Write 8, Try read 12, Read 8
 		printf("\nWrite 8 - Try read 12 - Read 8\n");
-		success = lfsend(queue_id, msg, 8);
+		success = lfsend(queue_id, msg, strlen(msg));
 		printf("[%d] Send 8-char message\n", success);
 
 		success = lfreceive(queue_id, rcv, 12);
@@ -438,7 +438,7 @@ int boundsTest() {
 
 		// Write 8, Read 8
 		printf("\nWrite 8 - Read 8\n");
-		success = lfsend(queue_id, msg, 8);
+		success = lfsend(queue_id, msg, strlen(msg));
 		printf("[%d] Send 8-char message\n", success);
 
 		success = lfreceive(queue_id, rcv, 8);
@@ -464,7 +464,7 @@ int simpleTest() {
 
 	printf("Simple Test Started\n");
 	if(queue_id >= 0) {
-		lfsend(queue_id, "stuff", 6);
+		lfsend(queue_id, "stuff", strlen("stuff"));
 		printf("Sent message to %d\n", queue_id);
 
 		read_size = lfreceive(queue_id, msg, 6);
@@ -478,9 +478,5 @@ int simpleTest() {
 	printf("Simple Test Ended\n\n");
 
 	return 0;
-}
-
-void println(char * string) {
-	printf("%s\n", string);
 }
 

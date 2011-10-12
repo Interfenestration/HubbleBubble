@@ -66,6 +66,8 @@ static int send_message(int queue_id, char * msg, int size) {
 
 	cp_msg = kmalloc(sizeof(char) * size, GFP_KERNEL); // might be sizeof(char *)
 
+	printk("qqmodule: send_message trying to access queue %d; size: %d", queue_id, size);
+
 	q = queue_list[queue_id];
 
 	if(q == 0)
@@ -100,6 +102,8 @@ static int send_message(int queue_id, char * msg, int size) {
 				break;
 			}
 		} else {
+			printk("qqmodule: send_message -> X!=0 \n");
+
 			res = cas(&(q->tail), tail, tail+1);
 		}
 	} while(true);
