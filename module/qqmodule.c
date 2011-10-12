@@ -4,6 +4,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
+
 MODULE_LICENSE("GPL");
 
 #define LIST_SIZE 30
@@ -43,14 +44,30 @@ static int free_map_slots = MAP_SIZE;
 static int destroy_queue(int queue_id);
 
 // old value e new value são endereços, dai inteiros.
-static int cas(void * cell, int oldvalue, int newvalue) {
+/*static int cas(void * cell, int oldvalue, int newvalue) {
 	char result;
 
 	asm ("lock cmpxchg %2, (%1) ; setz %0"
 		: "=r" (result)
 		: "r" (cell), "r" (newvalue), "a" (oldvalue));
 	return result;
+}*/
+
+static int cas(void * ptr, int oldvar, int newvar )
+{
+    unsigned char result;
+    asm volatile(
+    "lock; cmpxchg %3, %1\n"
+    "sete %b0\n"
+    : "=r"(result),
+      "+m"(*ptr),
+      "+a"(oldvar)
+    : "r"(newvar)
+    : "memory", "cc"
+    );
+    return result;
 }
+
 
 /* CAS-ENQUEUE
  * Sends a message to queue_id.
@@ -66,7 +83,8 @@ static int send_message(int queue_id, char * msg, int size) {
 
 	cp_msg = kmalloc(sizeof(char) * size, GFP_KERNEL); // might be sizeof(char *)
 
-	printk("qqmodule: send_message trying to access queue %d; size: %d", queue_id, size);
+	if(queue_id <= 0)
+		return -3; // invalid queue
 
 	q = queue_list[queue_id];
 
@@ -87,7 +105,7 @@ static int send_message(int queue_id, char * msg, int size) {
 		}
 		if(tail == q->head + LIST_SIZE) {
 			printk("qqmodule: send_message -> going to wait...\n");
-			wait_event(q->wait_queue, (tail != q->head + LIST_SIZE));
+			wait_event_interruptible(q->wait_queue, (tail != q->head + LIST_SIZE));
 			continue;
 		}
 		if(x == 0) {
@@ -119,6 +137,7 @@ static int send_message(int queue_id, char * msg, int size) {
  */
 static int receive_message(int queue_id, char * msg, int size) {
 	int head;
+	int msg_size;
 	char * x;
 	int res;
 	Queue * q;
@@ -126,8 +145,13 @@ static int receive_message(int queue_id, char * msg, int size) {
 
 	printk("qqmodule: receive_message start\n");
 
+	if(queue_id <= 0)
+		return -3; // invalid queue
 	
 	q = queue_list[queue_id];
+
+	if(q == 0)
+		return -3; // invalid queue
 
 	printk("qqmodule: receive_message -> looooooooooop\n");
 
@@ -140,30 +164,31 @@ static int receive_message(int queue_id, char * msg, int size) {
 		}
 		if(head == q->tail) {
 			printk("qqmodule: receive_message -> going to wait...\n");
-			wait_event(q->wait_queue, (q->head != q->tail));
+			wait_event_interruptible(q->wait_queue, (q->head != q->tail));
 			continue;
 		}
 		if(x != 0) {
 			printk("qqmodule: receive_message -> before CAS\n");
 			if(cas(&(q->messages[head % LIST_SIZE]), (int) x, 0)) {
 				res = cas(&(q->head), head, head+1);
+				msg_size = q->messages_size[head % LIST_SIZE];
 
-				if(size > q->messages_size[head % LIST_SIZE])
-					size_to_retrieve = q->messages_size[head % LIST_SIZE];
+				if(size > msg_size)
+					size_to_retrieve = msg_size;
 				else
 					size_to_retrieve = size;
 
 				copy_to_user(msg, x, size_to_retrieve);
 				kfree(x);
 
-				res = cas(&(q->messages_size[head % LIST_SIZE]), q->messages_size[head % LIST_SIZE], 0);
+				res = cas(&(q->messages_size[head % LIST_SIZE]), msg_size, 0);
 				wake_up(&(q->wait_queue));
 				break;
 			}
 		} else {
+			printk("qqmodule: receive_message -> X==0 \n");
 			res = cas(&(q->head), head, head+1);
 		}
-		printk("qqmodule: receive_message -> trying again to receive\n");
 	} while(true);
 
 	return size_to_retrieve;

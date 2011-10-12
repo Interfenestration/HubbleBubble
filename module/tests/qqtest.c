@@ -14,8 +14,8 @@ int simpleTest();
 
 int main(int argc, char * argv[]) {
 	//simpleTest();
-	joinLeaveTest();
-	//forkItOnce();
+	//joinLeaveTest();
+	forkItOnce();
 	//forkItTwice();
 	//pluralTest();
 	//boundsTest();
@@ -28,7 +28,7 @@ int forkItTwice() {
 	int success;
 	char * msgs[9];
 	char received[50];
-	char queue_name[] = "family";
+	char * queue_name = "family";
 	int messages_wanted = 3;
 	int messages_received = 0;
 	msgs[0] = "fc2c-"; // From Child To Child
@@ -117,26 +117,27 @@ int forkItOnce() {
 	int childRead_parentWrite;
 	int childWrite_parentRead;
 	int success;
-	char crpw[] = "crpw";
-	char cwpr[] = "cwpr";
-	char son1[] = "Hello, Parent";
-	char father1[] = "Hello, Child";
-	char son2[] = "Parent, where do Children come from?";
-	char father21[] = "Well, you see Child...";
-	char father22[] = "When a Process loves itself so much...";
-	char father23[] = "It grabs a fork and...";
-	char father24[] = "A Child is born!";
-	char son3[] = "And how does the Parent know it's the Parent and the Child knows it's the Child?";
-	char father31[] = "That's easy!";
-	char father32[] = "Both check what the fork left behind...";
-	char father33[] = "If what they see is nothing then they're the Child...";
-	char father34[] = "If what the see is the Child then they're the Parent.";
-	char son4[] = "Thank you, Parent.";
-	char father4[] = "You're welcome, Child";
-	char son5[] = "I hope you wait for me...";
-	char father5[] = "I will...";
-	char father6[] = "...Or not. You can be a zombie for all I care...";
-	char receive[100];
+	int size;
+	char * crpw = "crpw";
+	char * cwpr = "cwpr";
+	char * son1 = "Hello, Parent";
+	char * father1 = "Hello, Child";
+	char * son2 = "Parent, where do Children come from?";
+	char * father21 = "Well, you see Child...";
+	char * father22 = "When a Process loves itself so much...";
+	char * father23 = "It grabs a fork and...";
+	char * father24 = "A Child is born!";
+	char * son3 = "And how does the Parent know it's the Parent and the Child knows it's the Child?";
+	char * father31 = "That's easy!";
+	char * father32 = "Both check what the fork left behind...";
+	char * father33 = "If what they see is nothing then they're the Child...";
+	char * father34 = "If what the see is the Child then they're the Parent.";
+	char * son4 = "Thank you, Parent.";
+	char * father4 = "You're welcome, Child";
+	char * son5 = "I hope you wait for me...";
+	char * father5 = "I will...";
+	char * father6 = "...Or not. You can be a zombie for all I care...";
+	char * receive = malloc(sizeof(char) * 100);
 
 	printf("Fork It Once Test Started\n");
 	success = fork();
@@ -145,58 +146,60 @@ int forkItOnce() {
 	} else if(success == 0) { // Son
 		childRead_parentWrite = lfattach(crpw, strlen(crpw));
 		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
+		printf("Child has attached\n");
 		lfsend(childWrite_parentRead, son1, strlen(son1));
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father1
+		printf("Parent said: %s; size=%d\n", receive, size); // father1
 		lfsend(childWrite_parentRead, son2, strlen(son2));
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father21
+		printf("Parent said: %s; size=%d\n", receive, size); // father21
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father22
+		printf("Parent said: %s; size=%d\n", receive, size); // father22
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father23
+		printf("Parent said: %s; size=%d\n", receive, size); // father23
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father24
+		printf("Parent said: %s; size=%d\n", receive, size); // father24
 		lfsend(childWrite_parentRead, son3, strlen(son3));
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father31
+		printf("Parent said: %s; size=%d\n", receive, size); // father31
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father32
+		printf("Parent said: %s; size=%d\n", receive, size); // father32
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father33
+		printf("Parent said: %s; size=%d\n", receive, size); // father33
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father34
+		printf("Parent said: %s; size=%d\n", receive, size); // father34
 		lfsend(childWrite_parentRead, son4, strlen(son4));
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father4
+		printf("Parent said: %s; size=%d\n", receive, size); // father4
 		lfsend(childWrite_parentRead, son5, strlen(son5));
 		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s\n", receive); // father5
+		printf("Parent said: %s; size=%d\n", receive, size); // father5
 		lfleave(childRead_parentWrite);
 		lfleave(childWrite_parentRead);
 	} else { // Parent
 		childRead_parentWrite = lfattach(crpw, strlen(crpw));
 		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
+		printf("Parent has attached");
 		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s\n", receive);
+		printf("Child said: %s; size=%d\n", receive, size);
 		lfsend(childRead_parentWrite, father1, strlen(father1) + 1);
 		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s\n", receive);
+		printf("Child said: %s; size=%d\n", receive, size);
 		lfsend(childRead_parentWrite, father21, strlen(father21) + 1);
 		lfsend(childRead_parentWrite, father22, strlen(father22) + 1);
 		lfsend(childRead_parentWrite, father23, strlen(father23) + 1);
 		lfsend(childRead_parentWrite, father24, strlen(father24) + 1);
 		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s\n", receive);
+		printf("Child said: %s; size=%d\n", receive, size);
 		lfsend(childRead_parentWrite, father31, strlen(father31) + 1);
 		lfsend(childRead_parentWrite, father32, strlen(father32) + 1);
 		lfsend(childRead_parentWrite, father33, strlen(father33) + 1);
 		lfsend(childRead_parentWrite, father34, strlen(father34) + 1);
 		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s\n", receive);
+		printf("Child said: %s; size=%d\n", receive, size);
 		lfsend(childRead_parentWrite, father4, strlen(father4) + 1);
 		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s\n", receive);
+		printf("Child said: %s; size=%d\n", receive, size);
 		lfsend(childRead_parentWrite, father5, strlen(father5) + 1);
 		lfsend(childRead_parentWrite, father6, strlen(father6) + 1);
 		lfleave(childRead_parentWrite);
@@ -212,34 +215,34 @@ int joinLeaveTest() {
 
 	printf("Join-Leave Test Started\n");
 	queue_ids[0] = lfattach("zero", strlen("zero"));
-	success = (queue_ids[0] >= 0);
+	success = !(queue_ids[0] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[1] = lfattach("un", strlen("un"));
-	success = (queue_ids[1] >= 0);
+	success = !(queue_ids[1] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[2] = lfattach("deux", strlen("deux"));
-	success = (queue_ids[2] >= 0);
+	success = !(queue_ids[2] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[3] = lfattach("trois", strlen("trois"));
-	success = (queue_ids[3] >= 0);
+	success = !(queue_ids[3] >= 0);
 	printf("[%d] Queue Attach\n", success);
-	queue_ids[8] = lfattach("quatre", strlen("quatre"));
-	success = (queue_ids[4] >= 0);
+	queue_ids[4] = lfattach("quatre", strlen("quatre"));
+	success = !(queue_ids[4] >= 0);
 	printf("[%d] Queue Attach\n", success);
-	queue_ids[8] = lfattach("cinq", strlen("cinq"));
-	success = (queue_ids[5] >= 0);
+	queue_ids[5] = lfattach("cinq", strlen("cinq"));
+	success = !(queue_ids[5] >= 0);
 	printf("[%d] Queue Attach\n", success);
-	queue_ids[8] = lfattach("six", strlen("six"));
-	success = (queue_ids[6] >= 0);
+	queue_ids[6] = lfattach("six", strlen("six"));
+	success = !(queue_ids[6] >= 0);
 	printf("[%d] Queue Attach\n", success);
-	queue_ids[8] = lfattach("sept", strlen("sept"));
-	success = (queue_ids[7] >= 0);
+	queue_ids[7] = lfattach("sept", strlen("sept"));
+	success = !(queue_ids[7] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[8] = lfattach("huit", strlen("huit"));
-	success = (queue_ids[8] >= 0);
+	success = !(queue_ids[8] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[9] = lfattach("neuf", strlen("neuf"));
-	success = (queue_ids[9] >= 0);
+	success = !(queue_ids[9] >= 0);
 	printf("[%d] Queue Attach\n", success);
 
 	success = lfleave(queue_ids[1]);
@@ -254,19 +257,19 @@ int joinLeaveTest() {
 	printf("[%d] Queue Leave\n", success);
 
 	queue_ids[1] = lfattach("dix", strlen("dix"));
-	success = (queue_ids[1] >= 0);
+	success = !(queue_ids[1] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[3] = lfattach("onze", strlen("onze"));
-	success = (queue_ids[3] >= 0);
+	success = !(queue_ids[3] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[5] = lfattach("douze", strlen("douze"));
-	success = (queue_ids[5] >= 0);
+	success = !(queue_ids[5] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[7] = lfattach("treize", strlen("treize"));
-	success = (queue_ids[7] >= 0);
+	success = !(queue_ids[7] >= 0);
 	printf("[%d] Queue Attach\n", success);
 	queue_ids[9] = lfattach("quatorze", strlen("quatorze"));
-	success = (queue_ids[9] >= 0);
+	success = !(queue_ids[9] >= 0);
 	printf("[%d] Queue Attach\n", success);
 
 	success = lfsend(queue_ids[0], "0", strlen("0"));
@@ -338,9 +341,9 @@ int joinLeaveTest() {
 int pluralTest() {
 	int success;
 	int q1, q2, q3;
-	char msg1[] = "8 chars";
-	char msg2[] = "12 chars :D";
-	char msg3[] = "13 chars :-(";
+	char * msg1 = "8 chars";
+	char * msg2 = "12 chars :D";
+	char * msg3 = "13 chars :-(";
 	char rcv[13];
 	q1 = lfattach("uno", strlen("uno"));
 	q2 = lfattach("dos", strlen("dos"));
@@ -408,7 +411,7 @@ int boundsTest() {
 	int success;
 	int queue_id;
 	char * rcv;
-	char msg[] = "8 chars";
+	char * msg = "8 chars";
 	rcv = malloc(sizeof(char) * 8);
 	queue_id = lfattach("stuff", strlen("stuff"));
 
