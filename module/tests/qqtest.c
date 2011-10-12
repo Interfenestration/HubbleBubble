@@ -7,14 +7,14 @@
 int forkItTwice();
 int for_me(char[], char);
 int forkItOnce();
-int joinLeaveTest();
+int joinLeaveDestroyTest();
 int pluralTest();
 int boundsTest();
 int simpleTest();
 
 int main(int argc, char * argv[]) {
 	//simpleTest();
-	//joinLeaveTest();
+	//joinLeaveDestroyTest();
 	forkItOnce();
 	//forkItTwice();
 	//pluralTest();
@@ -209,7 +209,7 @@ int forkItOnce() {
 	return 0;
 }
 
-int joinLeaveTest() {
+int joinLeaveDestroyTest() {
 	int queue_ids[10];
 	int success;
 
@@ -303,16 +303,16 @@ int joinLeaveTest() {
 	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[4]);
 	printf("[%d] Queue Leave\n", success);
-	success = lfleave(queue_ids[5]);
-	printf("[%d] Queue Leave\n", success);
-	success = lfleave(queue_ids[6]);
-	printf("[%d] Queue Leave\n", success);
-	success = lfleave(queue_ids[7]);
-	printf("[%d] Queue Leave\n", success);
-	success = lfleave(queue_ids[8]);
-	printf("[%d] Queue Leave\n", success);
-	success = lfleave(queue_ids[9]);
-	printf("[%d] Queue Leave\n", success);
+	success = lfdestroy(queue_ids[5]);
+	printf("[%d] Queue Destroy\n", success);
+	success = lfdestroy(queue_ids[6]);
+	printf("[%d] Queue Destroy\n", success);
+	success = lfdestroy(queue_ids[7]);
+	printf("[%d] Queue Destroy\n", success);
+	success = lfdestroy(queue_ids[8]);
+	printf("[%d] Queue Destroy\n", success);
+	success = lfdestroy(queue_ids[9]);
+	printf("[%d] Queue Destroy\n", success);
 
 	success = lfsend(queue_ids[0], "0", strlen("0"));
 	printf("[%d] Queue Send Fail\n", !success);
