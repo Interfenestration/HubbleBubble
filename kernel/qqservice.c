@@ -3,7 +3,7 @@
 #include <linux/module.h>
 
 int (* sys_qqmodule) (int, int, char *, int);
-int (* sys_qqmodule_named_attach) (char *, pid_t);
+int (* sys_qqmodule_named_attach) (char *, int, pid_t);
 int (* sys_qqmodule_named) (int, int, pid_t);
 
 asmlinkage int sys_qqservice(int op, int queue_id, char * msg, int size) {
@@ -15,13 +15,13 @@ asmlinkage int sys_qqservice(int op, int queue_id, char * msg, int size) {
         return sys_qqmodule(op, queue_id, msg, size);
 }
 
-asmlinkage int sys_qqservice_named_attach(char * name, pid_t pid) {
+asmlinkage int sys_qqservice_named_attach(char * name, int size, pid_t pid) {
     if(sys_qqmodule_named_attach == 0) {
         printk("qqservice: failed to access sys_qqmodule_named_attach\n");
         return -1;
     }
     else
-        return sys_qqmodule_named_attach(name, pid);
+        return sys_qqmodule_named_attach(name, size, pid);
 }
 
 asmlinkage int sys_qqservice_named(int op, int queue_id, pid_t pid) {

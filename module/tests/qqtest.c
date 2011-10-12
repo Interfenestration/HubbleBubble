@@ -14,7 +14,12 @@ int simpleTest();
 void println(char*);
 
 int main(int argc, char * argv[]) {
-	simpleTest();
+	//simpleTest();
+	joinLeaveTest();
+	//forkItOnce();
+	//forkItTwice();
+	//pluralTest();
+	//boundsTest();
 	return 0;
 }
 
@@ -44,7 +49,7 @@ int forkItTwice() {
 	else if(success == 0) { // Parent
 		success = fork();
 		if(success == 0) { // Child
-			queue_id = lfattach(queue_name);
+			queue_id = lfattach(queue_name, strlen(queue_name));
 			lfsend(queue_id, msgs[0], 50);
 			lfsend(queue_id, msgs[1], 50);
 			lfsend(queue_id, msgs[2], 50);
@@ -62,7 +67,7 @@ int forkItTwice() {
 			lfleave(queue_id);
 		}
 		else { // Still Parent
-			queue_id = lfattach(queue_name);
+			queue_id = lfattach(queue_name, strlen(queue_name));
 			lfsend(queue_id, msgs[3], 50);
 			lfsend(queue_id, msgs[4], 50);
 			lfsend(queue_id, msgs[5], 50);
@@ -81,7 +86,7 @@ int forkItTwice() {
 		}
 	}
 	else { // Grandparent
-		queue_id = lfattach(queue_name);
+		queue_id = lfattach(queue_name, strlen(queue_name));
 			lfsend(queue_id, msgs[6], 50);
 			lfsend(queue_id, msgs[7], 50);
 			lfsend(queue_id, msgs[8], 50);
@@ -138,8 +143,8 @@ int forkItOnce() {
 	if(success == -1) {
 		printf("Fork Failed!");
 	} else if(success == 0) { // Son
-		childRead_parentWrite = lfattach(crpw);
-		childWrite_parentRead = lfattach(cwpr);
+		childRead_parentWrite = lfattach(crpw, strlen(crpw));
+		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
 		lfsend(childWrite_parentRead, son1, strlen(son1) + 1);
 		lfreceive(childRead_parentWrite, receive, 100);
 		printf("Parent said: %s\n", receive); // father1
@@ -170,8 +175,8 @@ int forkItOnce() {
 		lfleave(childRead_parentWrite);
 		lfleave(childWrite_parentRead);
 	} else { // Parent
-		childRead_parentWrite = lfattach(crpw);
-		childWrite_parentRead = lfattach(cwpr);
+		childRead_parentWrite = lfattach(crpw, strlen(crpw));
+		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
 		lfreceive(childWrite_parentRead, receive, 100);
 		printf("Child said: %s\n", receive);
 		lfsend(childRead_parentWrite, father1, strlen(father1) + 1);
@@ -206,126 +211,126 @@ int joinLeaveTest() {
 	int success;
 
 	printf("Join-Leave Test Started\n");
-	queue_ids[0] = lfattach("zero");
+	queue_ids[0] = lfattach("zero", strlen("zero"));
 	success = (queue_ids[0] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[1] = lfattach("un");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[1] = lfattach("un", strlen("un"));
 	success = (queue_ids[1] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[2] = lfattach("deux");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[2] = lfattach("deux", strlen("deux"));
 	success = (queue_ids[2] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[3] = lfattach("trois");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[3] = lfattach("trois", strlen("trois"));
 	success = (queue_ids[3] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[8] = lfattach("quatre");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[8] = lfattach("quatre", strlen("quatre"));
 	success = (queue_ids[4] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[8] = lfattach("cinq");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[8] = lfattach("cinq", strlen("cinq"));
 	success = (queue_ids[5] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[8] = lfattach("six");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[8] = lfattach("six", strlen("six"));
 	success = (queue_ids[6] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[8] = lfattach("sept");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[8] = lfattach("sept", strlen("sept"));
 	success = (queue_ids[7] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[8] = lfattach("huit");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[8] = lfattach("huit", strlen("huit"));
 	success = (queue_ids[8] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[9] = lfattach("neuf");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[9] = lfattach("neuf", strlen("neuf"));
 	success = (queue_ids[9] >= 0);
-	printf("[%d] Queue Attach", success);
+	printf("[%d] Queue Attach\n", success);
 
 	success = lfleave(queue_ids[1]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[3]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[5]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[7]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[9]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 
-	queue_ids[1] = lfattach("dix");
+	queue_ids[1] = lfattach("dix", strlen("dix"));
 	success = (queue_ids[1] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[3] = lfattach("onze");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[3] = lfattach("onze", strlen("onze"));
 	success = (queue_ids[3] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[5] = lfattach("douze");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[5] = lfattach("douze", strlen("douze"));
 	success = (queue_ids[5] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[5] = lfattach("treize");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[7] = lfattach("treize", strlen("treize"));
 	success = (queue_ids[7] >= 0);
-	printf("[%d] Queue Attach", success);
-	queue_ids[5] = lfattach("quatorze");
+	printf("[%d] Queue Attach\n", success);
+	queue_ids[9] = lfattach("quatorze", strlen("quatorze"));
 	success = (queue_ids[9] >= 0);
-	printf("[%d] Queue Attach", success);
+	printf("[%d] Queue Attach\n", success);
 
 	success = lfsend(queue_ids[0], "0", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[1], "1", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[2], "2", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[3], "3", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[4], "4", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[5], "5", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[6], "6", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[7], "7", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[8], "8", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 	success = lfsend(queue_ids[9], "9", 1);
-	printf("[%d] Message Send", success);
+	printf("[%d] Message Send\n", success);
 
 	success = lfleave(queue_ids[0]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[1]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[2]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[3]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[4]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[5]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[6]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[7]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[8]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 	success = lfleave(queue_ids[9]);
-	printf("[%d] Queue Leave", success);
+	printf("[%d] Queue Leave\n", success);
 
 	success = lfsend(queue_ids[0], "0", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[1], "1", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[2], "2", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[3], "3", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[4], "4", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[5], "5", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[6], "6", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[7], "7", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[8], "8", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 	success = lfsend(queue_ids[9], "9", 1);
-	printf("[%d] Queue Send Fail", !success);
+	printf("[%d] Queue Send Fail\n", !success);
 
 	return 0;
 }
@@ -337,9 +342,9 @@ int pluralTest() {
 	char msg2[] = "12 chars :D";
 	char msg3[] = "13 chars :-(";
 	char rcv[13];
-	q1 = lfattach("uno");
-	q2 = lfattach("dos");
-	q3 = lfattach("tres");
+	q1 = lfattach("uno", strlen("uno"));
+	q2 = lfattach("dos", strlen("dos"));
+	q3 = lfattach("tres", strlen("tres"));
 
 	println("Plural Test Started");
 	if(q1 >= 0 && q2 >= 0 && q3 >= 0) {
@@ -405,7 +410,7 @@ int boundsTest() {
 	char * rcv;
 	char msg[] = "8 chars";
 	rcv = malloc(sizeof(char) * 8);
-	queue_id = lfattach("stuff");
+	queue_id = lfattach("stuff", strlen("stuff"));
 
 	println("Bound Test Start\n");
 	if(queue_id >= 0) {
@@ -451,19 +456,20 @@ int boundsTest() {
 
 int simpleTest() {
 	int queue_id;
+	int read_size;
 	char * msg;
 	msg = malloc(sizeof(char)*6);
 
-	queue_id = lfattach("stuff");
+	queue_id = lfattach("stuff", strlen("stuff"));
 
 	printf("Simple Test Started\n");
 	if(queue_id >= 0) {
 		lfsend(queue_id, "stuff", 6);
 		printf("Sent message to %d\n", queue_id);
 
-		lfreceive(queue_id, msg, 6);
+		read_size = lfreceive(queue_id, msg, 6);
 
-		printf("Received %s\n", msg);
+		printf("Received size:%d :: %s\n", read_size,msg);
 
 		lfdestroy(queue_id);
 	} else {

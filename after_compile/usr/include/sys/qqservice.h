@@ -14,7 +14,7 @@
 
 #define lfreceive(queue_id, msg, size) syscall(__NR_qqservice, LF_RECEIVE, queue_id, msg, size);
 
-#define lfattach(name) syscall(__NR_qqservice_named_attach, name, getpid());
+#define lfattach(name, size) syscall(__NR_qqservice_named_attach, name, size, getpid());
 
 #define lfleave(queue_id) syscall(__NR_qqservice_named, LF_LEAVE, queue_id, getpid());
 
