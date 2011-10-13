@@ -4,211 +4,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int forkItTwice();
-int for_me(char[], char);
-int forkItOnce();
 int joinLeaveDestroyTest();
 int pluralTest();
 int boundsTest();
 int simpleTest();
 
 int main(int argc, char * argv[]) {
-	//simpleTest();
-	//joinLeaveDestroyTest();
-	forkItOnce();
-	//forkItTwice();
-	//pluralTest();
-	//boundsTest();
+	simpleTest();
+	joinLeaveDestroyTest();
+	pluralTest();
+	boundsTest();
 
 	return 0;
 }
 
-int forkItTwice() {
-	int queue_id;
-	int success;
-	char * msgs[9];
-	char received[50];
-	char * queue_name = "family";
-	int messages_wanted = 3;
-	int messages_received = 0;
-	msgs[0] = "fc2c-"; // From Child To Child
-	msgs[1] = "fc2p-"; // From Child To Parent
-	msgs[2] = "fc2g-"; // From Child To Grandparent
-	msgs[3] = "fp2c-"; // ...
-	msgs[4] = "fp2p-";
-	msgs[5] = "fp2g-";
-	msgs[6] = "fg2c-";
-	msgs[7] = "fg2p-";
-	msgs[8] = "fg2g-"; // From Grandparent To Grandparent
-
-	printf("Fork It Twice Test Started\n");
-	success = fork();
-	if(success == -1) {
-		printf("Fork Failed\n");
-	}
-	else if(success == 0) { // Parent
-		success = fork();
-		if(success == 0) { // Child
-			queue_id = lfattach(queue_name, strlen(queue_name));
-			lfsend(queue_id, msgs[0], strlen(msgs[0]));
-			lfsend(queue_id, msgs[1], strlen(msgs[1]));
-			lfsend(queue_id, msgs[2], strlen(msgs[2]));
-			while(messages_received < messages_wanted) {
-				lfreceive(queue_id, received, 50);
-				if(for_me(received, 'c')) {
-					printf("Child received: %s\n", received);
-					messages_received++;
-				}
-				else {
-					printf("Child says: Not for me... %s\n", received);
-					lfsend(queue_id, received, 50);
-				}
-			}
-			lfleave(queue_id);
-		}
-		else { // Still Parent
-			queue_id = lfattach(queue_name, strlen(queue_name));
-			lfsend(queue_id, msgs[3], strlen(msgs[3]));
-			lfsend(queue_id, msgs[4], strlen(msgs[4]));
-			lfsend(queue_id, msgs[5], strlen(msgs[5]));
-			while(messages_received < messages_wanted) {
-				lfreceive(queue_id, received, 50);
-				if(for_me(received, 'p')) {
-					printf("Parent received: %s\n", received);
-					messages_received++;
-				}
-				else {
-					printf("Parent says: Not for me... %s\n", received);
-					lfsend(queue_id, received, 50);
-				}
-			}
-			lfleave(queue_id);
-		}
-	}
-	else { // Grandparent
-		queue_id = lfattach(queue_name, strlen(queue_name));
-			lfsend(queue_id, msgs[6], strlen(msgs[6]));
-			lfsend(queue_id, msgs[7], strlen(msgs[7]));
-			lfsend(queue_id, msgs[8], strlen(msgs[8]));
-			while(messages_received < messages_wanted) {
-				lfreceive(queue_id, received, 50);
-				if(for_me(received, 'g')) {
-					printf("Grandparent received: %s\n", received);
-					messages_received++;
-				}
-				else {
-					printf("Grandparent says: Not for me... %s\n", received);
-					lfsend(queue_id, received, 50);
-				}
-			}
-			lfleave(queue_id);
-	}
-
-	printf("Fork It Twice Test Ended\n\n");
-	return 0;
-}
-
-
-int for_me(char * msg, char me) {
-	return msg[3] == me;
-}
-
-int forkItOnce() {
-	int childRead_parentWrite;
-	int childWrite_parentRead;
-	int success;
-	int size;
-	char * crpw = "crpw";
-	char * cwpr = "cwpr";
-	char * son1 = "Hello, Parent";
-	char * father1 = "Hello, Child";
-	char * son2 = "Parent, where do Children come from?";
-	char * father21 = "Well, you see Child...";
-	char * father22 = "When a Process loves itself so much...";
-	char * father23 = "It grabs a fork and...";
-	char * father24 = "A Child is born!";
-	char * son3 = "And how does the Parent know it's the Parent and the Child knows it's the Child?";
-	char * father31 = "That's easy!";
-	char * father32 = "Both check what the fork left behind...";
-	char * father33 = "If what they see is nothing then they're the Child...";
-	char * father34 = "If what the see is the Child then they're the Parent.";
-	char * son4 = "Thank you, Parent.";
-	char * father4 = "You're welcome, Child";
-	char * son5 = "I hope you wait for me...";
-	char * father5 = "I will...";
-	char * father6 = "...Or not. You can be a zombie for all I care...";
-	char * receive = malloc(sizeof(char) * 100);
-
-	printf("Fork It Once Test Started\n");
-	success = fork();
-	if(success == -1) {
-		printf("Fork Failed!");
-	} else if(success == 0) { // Son
-		childRead_parentWrite = lfattach(crpw, strlen(crpw));
-		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
-		printf("Child has attached\n");
-		lfsend(childWrite_parentRead, son1, strlen(son1));
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father1
-		lfsend(childWrite_parentRead, son2, strlen(son2));
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father21
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father22
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father23
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father24
-		lfsend(childWrite_parentRead, son3, strlen(son3));
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father31
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father32
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father33
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father34
-		lfsend(childWrite_parentRead, son4, strlen(son4));
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father4
-		lfsend(childWrite_parentRead, son5, strlen(son5));
-		lfreceive(childRead_parentWrite, receive, 100);
-		printf("Parent said: %s; size=%d\n", receive, size); // father5
-		lfleave(childRead_parentWrite);
-		lfleave(childWrite_parentRead);
-	} else { // Parent
-		childRead_parentWrite = lfattach(crpw, strlen(crpw));
-		childWrite_parentRead = lfattach(cwpr, strlen(cwpr));
-		printf("Parent has attached");
-		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s; size=%d\n", receive, size);
-		lfsend(childRead_parentWrite, father1, strlen(father1) + 1);
-		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s; size=%d\n", receive, size);
-		lfsend(childRead_parentWrite, father21, strlen(father21) + 1);
-		lfsend(childRead_parentWrite, father22, strlen(father22) + 1);
-		lfsend(childRead_parentWrite, father23, strlen(father23) + 1);
-		lfsend(childRead_parentWrite, father24, strlen(father24) + 1);
-		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s; size=%d\n", receive, size);
-		lfsend(childRead_parentWrite, father31, strlen(father31) + 1);
-		lfsend(childRead_parentWrite, father32, strlen(father32) + 1);
-		lfsend(childRead_parentWrite, father33, strlen(father33) + 1);
-		lfsend(childRead_parentWrite, father34, strlen(father34) + 1);
-		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s; size=%d\n", receive, size);
-		lfsend(childRead_parentWrite, father4, strlen(father4) + 1);
-		lfreceive(childWrite_parentRead, receive, 100);
-		printf("Child said: %s; size=%d\n", receive, size);
-		lfsend(childRead_parentWrite, father5, strlen(father5) + 1);
-		lfsend(childRead_parentWrite, father6, strlen(father6) + 1);
-		lfleave(childRead_parentWrite);
-		lfleave(childWrite_parentRead);
-	}
-	printf("Fork It Once Test Ended\n\n");
-	return 0;
-}
-
+/* Testa a utilizacao geral das queues e unico a este teste, envio de mensagens para queues existentes a que nao está attach. */
 int joinLeaveDestroyTest() {
 	int queue_ids[10];
 	int success;
@@ -338,16 +148,19 @@ int joinLeaveDestroyTest() {
 	return 0;
 }
 
+/* Testa o envio de mensagens e a recepcao tal como a ordenacao nas queues */
 int pluralTest() {
 	int success;
-	int q1, q2, q3;
+	int q1;
+	int q2;
+	int q3;
 	char * msg1 = "8 chars";
-	char * msg2 = "12 chars :D";
-	char * msg3 = "13 chars :-(";
-	char rcv[13];
-	q1 = lfattach("uno", strlen("uno"));
-	q2 = lfattach("dos", strlen("dos"));
-	q3 = lfattach("tres", strlen("tres"));
+	char * msg2 = "12 chars bs";
+	char * msg3 = "13 chars bcb";
+	char * rcv = calloc(sizeof(char), 20);
+	q1 = lfattach("_uno_", strlen("_uno_"));
+	q3 = lfattach("_tres_", strlen("_tres_"));
+	q2 = lfattach("_dos_", strlen("_dos_"));
 
 	printf("Plural Test Started\n");
 	if(q1 >= 0 && q2 >= 0 && q3 >= 0) {
@@ -362,43 +175,61 @@ int pluralTest() {
 		lfsend(q3, msg2, strlen(msg2));
 
 		// From queue 1
-		lfreceive(q1, rcv, 8);
+		lfreceive(q1, rcv, strlen(msg1));
 		success = strcmp(rcv, msg1);
 		printf("[%d] From q1: %s == %s\n", success, rcv, msg1);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
-		lfreceive(q1, rcv, 12);
+		lfreceive(q1, rcv, strlen(msg2));
 		success = strcmp(rcv, msg2);
 		printf("[%d] From q1: %s == %s\n", success, rcv, msg2);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
-		lfreceive(q1, rcv, 13);
+		lfreceive(q1, rcv, strlen(msg3));
 		success = strcmp(rcv, msg3);
 		printf("[%d] From q1: %s == %s\n", success, rcv, msg3);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
 		// From queue 2
-		lfreceive(q2, rcv, 12);
+		lfreceive(q2, rcv, strlen(msg2));
 		success = strcmp(rcv, msg2);
 		printf("[%d] From q2: %s == %s\n", success, rcv, msg2);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
-		lfreceive(q2, rcv, 13);
+		lfreceive(q2, rcv, strlen(msg3));
 		success = strcmp(rcv, msg3);
 		printf("[%d] From q2: %s == %s\n", success, rcv, msg3);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
-		lfreceive(q2, rcv, 8);
+		lfreceive(q2, rcv, strlen(msg1));
 		success = strcmp(rcv, msg1);
 		printf("[%d] From q2: %s == %s\n", success, rcv, msg1);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
 		// From queue 3
-		lfreceive(q3, rcv, 13);
+		lfreceive(q3, rcv, strlen(msg3));
 		success = strcmp(rcv, msg3);
 		printf("[%d] From q1: %s == %s\n", success, rcv, msg3);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
-		lfreceive(q3, rcv, 8);
+		lfreceive(q3, rcv, strlen(msg1));
 		success = strcmp(rcv, msg1);
 		printf("[%d] From q1: %s == %s\n", success, rcv, msg1);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
-		lfreceive(q3, rcv, 12);
+		lfreceive(q3, rcv, strlen(msg2));
 		success = strcmp(rcv, msg2);
 		printf("[%d] From q1: %s == %s\n", success, rcv, msg2);
+		free(rcv);
+		rcv = calloc(sizeof(char), 20);
 
 		printf("Plural Test End\n\n");
 		return 0;
@@ -407,13 +238,14 @@ int pluralTest() {
 	return -1;
 }
 
+/* Testa o envio de mensagens e a recepcao parcial e recepcao pedindo mais que a mensagem tem. */
 int boundsTest() {
 	int success;
 	int queue_id;
 	char * rcv;
 	char * msg = "8 chars";
-	rcv = malloc(sizeof(char) * 8);
-	queue_id = lfattach("stuff", strlen("stuff"));
+	rcv = calloc(sizeof(char), 8);
+	queue_id = lfattach("_stuff_", strlen("_stuff_"));
 
 	printf("Bound Test Start\n");
 	if(queue_id >= 0) {
@@ -434,7 +266,7 @@ int boundsTest() {
 		printf("[%d] Send 8-char message\n", success);
 
 		success = lfreceive(queue_id, rcv, 12);
-		printf("[%d] Read 12 chars (actually, just 8)\n", success - 8);
+		printf("[%d] Read 12 chars (actually, just 8)\n", success - 7);
 
 		success = strcmp(msg, rcv);
 		printf("[%d] Contents match\n", success);
@@ -445,7 +277,7 @@ int boundsTest() {
 		printf("[%d] Send 8-char message\n", success);
 
 		success = lfreceive(queue_id, rcv, 8);
-		printf("[%d] Read 8 chars\n", success - 8);
+		printf("[%d] Read 8 chars\n", success - 7);
 
 		success = strcmp(msg, rcv);
 		printf("[%d] Contents match\n", success);
@@ -457,22 +289,23 @@ int boundsTest() {
 	return -1;
 }
 
+/* Teste mais simples para testar funcionalidade basica do modulo */
 int simpleTest() {
 	int queue_id;
 	int read_size;
 	char * msg;
-	msg = malloc(sizeof(char)*6);
+	msg = calloc(sizeof(char),10);
 
 	queue_id = lfattach("stuff", strlen("stuff"));
 
 	printf("Simple Test Started\n");
 	if(queue_id >= 0) {
-		lfsend(queue_id, "stuff", strlen("stuff"));
-		printf("Sent message to %d\n", queue_id);
+		read_size = lfsend(queue_id, "stuff", strlen("stuff"));
+		printf("Sent message to %d; return code:%d\n", queue_id, read_size);
 
 		read_size = lfreceive(queue_id, msg, 6);
 
-		printf("Received size:%d :: %s\n", read_size,msg);
+		printf("Received size:%d :: %s\n", read_size, msg);
 
 		lfdestroy(queue_id);
 	} else {

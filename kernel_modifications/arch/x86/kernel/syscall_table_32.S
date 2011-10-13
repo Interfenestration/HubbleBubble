@@ -191,7 +191,7 @@ ENTRY(sys_call_table)
 	.long sys_ni_syscall	/* reserved for streams2 */
 	.long sys_vfork		/* 190 */
 	.long sys_getrlimit
-	.long sys_mmap2
+	.long sys_mmap_pgoff
 	.long sys_truncate64
 	.long sys_ftruncate64
 	.long sys_stat64	/* 195 */
@@ -324,6 +324,6 @@ ENTRY(sys_call_table)
 	.long sys_timerfd
 	.long sys_eventfd
 	.long sys_fallocate
-    .long sys_qqservice     /* 325 --- CHANGES START HERE */
-    .long sys_qqservice_named
-    .long sys_qqservice_named_attach
+	.long sys_qqservice		/* 325 */
+	.long sys_qqservice_named
+	.long sys_qqservice_named_attach

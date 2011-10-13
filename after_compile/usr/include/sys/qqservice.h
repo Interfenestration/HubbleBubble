@@ -10,9 +10,9 @@
 #define LF_SEND 1
 #define LF_RECEIVE 2
 
-#define lfsend(queue_id, msg, size) syscall(__NR_qqservice, LF_SEND, queue_id, msg, size);
+#define lfsend(queue_id, msg, size) syscall(__NR_qqservice, LF_SEND, queue_id, msg, size, getpid());
 
-#define lfreceive(queue_id, msg, size) syscall(__NR_qqservice, LF_RECEIVE, queue_id, msg, size);
+#define lfreceive(queue_id, msg, size) syscall(__NR_qqservice, LF_RECEIVE, queue_id, msg, size, getpid());
 
 #define lfattach(name, size) syscall(__NR_qqservice_named_attach, name, size, getpid());
 

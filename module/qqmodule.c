@@ -4,7 +4,6 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
-
 MODULE_LICENSE("GPL");
 
 #define LIST_SIZE 30
@@ -33,7 +32,7 @@ typedef struct {
 	int queue_id;
 } Connection;
 
-extern int (* sys_qqmodule) (int, int, char *, int);
+extern int (* sys_qqmodule) (int, int, char *, int, pid_t);
 extern int (* sys_qqmodule_named_attach) (char *, int, pid_t);
 extern int (* sys_qqmodule_named) (int, int, pid_t);
 
@@ -53,26 +52,32 @@ static int destroy_queue(int queue_id);
 	return result;
 }*/
 
-static int cas(void * ptr, int oldvar, int newvar )
+static int cas(int * reg, int oldval, int newval) 
 {
-    unsigned char result;
-    asm volatile(
-    "lock; cmpxchg %3, %1\n"
-    "sete %b0\n"
-    : "=r"(result),
-      "+m"(*ptr),
-      "+a"(oldvar)
-    : "r"(newvar)
-    : "memory", "cc"
-    );
-    return result;
+	int old_reg_val = *reg;
+	if (old_reg_val == oldval) {
+    	*reg = newval;
+    	return 1;
+	} 
+	return 0;
 }
 
+static int is_on_queue(int queue_id, pid_t pid) {
+	int i;
 
-/* CAS-ENQUEUE
+	for(i = 0; i < MAP_SIZE; i++)
+		if(map[i] != NULL &&
+		   map[i]->pid == pid &&
+		   map[i]->queue_id == queue_id)
+		   return 1;
+	return 0;
+}
+
+/* 
+ * CAS-ENQUEUE
  * Sends a message to queue_id.
  */
-static int send_message(int queue_id, char * msg, int size) {
+static int send_message(int queue_id, char * msg, int size, pid_t pid) {
 	int tail;
 	int res;
 	char * x;
@@ -83,13 +88,22 @@ static int send_message(int queue_id, char * msg, int size) {
 
 	cp_msg = kmalloc(sizeof(char) * size, GFP_KERNEL); // might be sizeof(char *)
 
-	if(queue_id <= 0)
+	if(queue_id < 0) {
+		printk("qqmodule: send_message -> invalid queue %d\n", queue_id);
 		return -3; // invalid queue
+	}
 
 	q = queue_list[queue_id];
 
-	if(q == 0)
+	if(q == 0) {
+		printk("qqmodule: send_message -> Queue reference is NULL\n");
 		return -3; // queue not found.
+	}
+
+	if(!is_on_queue(queue_id, pid)) {
+		printk("qqmodule: send_message -> process not attached to this queue_id\n");
+		return -4; // not attached to this queue
+	}
 	
 	printk("qqmodule: send_message -> copy_from_user\n");
 	copy_from_user(cp_msg, msg, size); // Check the size. might be bigger than its suposed to.
@@ -110,13 +124,15 @@ static int send_message(int queue_id, char * msg, int size) {
 		}
 		if(x == 0) {
 			printk("qqmodule: send_message -> before CAS\n");
-			if(cas(&(q->messages[tail % LIST_SIZE]), 0, (int) cp_msg)) {
+			if(cas(&(q->messages[tail % LIST_SIZE]), 0, (int) cp_msg) == 1) {
 				printk("qqmodule: send_message -> msg = %s\n", q->messages[tail % LIST_SIZE]);
 
 				res = cas(&(q->tail), tail, tail+1);
 				res = cas(&(q->messages_size[tail % LIST_SIZE]), 0, size);
 
 				wake_up(&(q->wait_queue));
+
+				printk("qqmodule: send_message -> saved %s; size: %d; tail: %d\n", q->messages[tail%LIST_SIZE], q->messages_size[tail%LIST_SIZE], q->tail);
 				break;
 			}
 		} else {
@@ -131,21 +147,22 @@ static int send_message(int queue_id, char * msg, int size) {
 
 }
 
-/* CAS-DEQUEUE
+/* 
+ * CAS-DEQUEUE
  * Retrieves a message from queue_id.
  * Pre-Condition - msg must be malloc'd (user side).
  */
-static int receive_message(int queue_id, char * msg, int size) {
+static int receive_message(int queue_id, char * msg, int size, pid_t pid) {
 	int head;
 	int msg_size;
 	char * x;
 	int res;
 	Queue * q;
-	int size_to_retrieve = -1;	
+	int size_to_retrieve = -999;	
 
 	printk("qqmodule: receive_message start\n");
 
-	if(queue_id <= 0)
+	if(queue_id < 0)
 		return -3; // invalid queue
 	
 	q = queue_list[queue_id];
@@ -153,7 +170,10 @@ static int receive_message(int queue_id, char * msg, int size) {
 	if(q == 0)
 		return -3; // invalid queue
 
-	printk("qqmodule: receive_message -> looooooooooop\n");
+	if(!is_on_queue(queue_id, pid)) {
+		printk("qqmodule: receive_message -> process not attached to this queue_id\n");
+		return -4; // not attached to this queue
+	}
 
 	do {
 		head = q->head;
@@ -169,7 +189,7 @@ static int receive_message(int queue_id, char * msg, int size) {
 		}
 		if(x != 0) {
 			printk("qqmodule: receive_message -> before CAS\n");
-			if(cas(&(q->messages[head % LIST_SIZE]), (int) x, 0)) {
+			if(cas(&(q->messages[head % LIST_SIZE]), (int) x, 0) == 1) {
 				res = cas(&(q->head), head, head+1);
 				msg_size = q->messages_size[head % LIST_SIZE];
 
@@ -184,6 +204,8 @@ static int receive_message(int queue_id, char * msg, int size) {
 				res = cas(&(q->messages_size[head % LIST_SIZE]), msg_size, 0);
 				wake_up(&(q->wait_queue));
 				break;
+			} else {
+				printk("qqmodule: receive_message -> failed first CAS");
 			}
 		} else {
 			printk("qqmodule: receive_message -> X==0 \n");
@@ -194,12 +216,12 @@ static int receive_message(int queue_id, char * msg, int size) {
 	return size_to_retrieve;
 }
 
-int sys_qqmodule_impl(int op, int queue_id, char* msg, int size) {
+int sys_qqmodule_impl(int op, int queue_id, char* msg, int size, pid_t pid) {
     switch(op) {
 	case LF_SEND:
-		return send_message(queue_id, msg, size);
+		return send_message(queue_id, msg, size, pid);
 	case LF_RECEIVE:
-		return receive_message(queue_id, msg, size);
+		return receive_message(queue_id, msg, size, pid);
 	}
 	return -5; // Unsupported OP
 }
@@ -220,7 +242,7 @@ static Queue * new_queue(char * name, pid_t pid) {
 		q->messages_size[i] = 0;
 	}
 
-	printk("qqmodule: new_queueue -> entering init_waitqueueue\n");
+	printk("qqmodule: new_queue -> entering init_waitqueue\n");
 	init_waitqueue_head(&(q->wait_queue));
 
 	return q;
@@ -236,12 +258,11 @@ static int create_queue(char * name, pid_t pid) {
 	Queue * q;
 	int i;
 
-	printk("qqmodule: create_queueue -> entering new_queue\n");
+	printk("qqmodule: create_queue -> entering new_queue\n");
 	q = new_queue(name, pid);
 
-	printk("qqmodule: create_queueue -> entering loop\n");
 	for(i = 0; i < LIST_SIZE; i++) {
-		if(cas(&(queue_list[i]), 0, (int) q)) {
+		if(cas(&(queue_list[i]), 0, (int) q) == 1) {
 			printk("qqmodule: create_queueue -> returning %d\n", i);
 			return i;
 		}
@@ -268,11 +289,12 @@ static int get_queue(char * name, pid_t pid) {
 				return i;
 		}
 	}
-	printk("qqmodule: get_queueue -> returning create_queue\n");
+	printk("qqmodule: get_queue -> returning create_queue\n");
 	// Queue does not exist, create it
 	return create_queue(name, pid);
 }
 
+/* Creates a Connection. */
 static Connection * create_connection(pid_t pid, int queue_id) {
 	Connection * c = kmalloc(sizeof(Connection), GFP_KERNEL);
 	c->pid = pid;
@@ -287,28 +309,29 @@ static int queue_attach(pid_t pid, int queue_id) {
 	Queue * q;
 	int i;
 	int res;
+	int npid;
 	int hasChanged = 0;
 
 	c = create_connection(pid, queue_id);
 	q = queue_list[queue_id];
 
-	printk("qqmodule: queue_attach -> entering looooooooop\n");
-
-
 	for(i = 0; i < LIST_SIZE; i++) {
-		if(cas(&(map[i]), 0, (int) c)) {
+		if(cas(&(map[i]), 0, (int) c) == 1) {
 			hasChanged = 1;
 			printk("qqmodule: queue_attach -> occupying %d\n", i);
 
 			res = cas(&free_map_slots, free_map_slots, free_map_slots-1);
 			printk("qqmodule: queue_attach -> passed free_map_slots\n");
 
+			do {
+				npid = q->pid_number;
+				res = cas(&q->pid_number, npid, npid+1);
+			} while (res != 1); 
+
 			break;
 		} else
 			continue; // Caso não consiga trocar o map[i] continua o loop até encontrar outro null.
 	}
-
-	printk("qqmodule: queue_attach -> out of loooooooooop\n");
 
 	if(hasChanged == 0)
 		return -2; // Failed.
@@ -339,17 +362,14 @@ int sys_qqmodule_named_attach_impl(char * name, int size, pid_t pid) {
 
 	queue_id = get_queue(kname, pid);
 
-	printk("qqmodule: named_attach_impl -> entering looooooooop\n");
-
-
 	for(i = 0; i < MAP_SIZE; i++) {
-		if(map[i] != NULL) 
+		if(map[i] != 0)
 			if(map[i]->pid == pid && map[i]->queue_id == queue_id) {
 		   		return -4; // Already attached
 			}
 	}
 
-	printk("qqmodule: named_attach_impl -> entering queueueue_attach\n");
+	printk("qqmodule: named_attach_impl -> entering queue_attach\n");
 
 	queue_attach(pid, queue_id);
     return queue_id;
@@ -358,7 +378,6 @@ int sys_qqmodule_named_attach_impl(char * name, int size, pid_t pid) {
 /*
  * Destroys the queue with the given queue_id, unlocking
  * all locked processes.
- * TODO Unlock the locked processes
  */
 static int destroy_queue(int queue_id) {
 	int i;
@@ -370,19 +389,18 @@ static int destroy_queue(int queue_id) {
 	down(&lfdestroy_mutex);
 	q = queue_list[queue_id];
 
-	// UNLOCK PROCESSES
 	// In case another process destroyed it first;
 	if(q == 0)
 		return -2;
-	
-	if(cas(&(queue_list[queue_id]), (int) queue_list[queue_id], 0)) {
+
+	if(cas(&(queue_list[queue_id]), (int) queue_list[queue_id], 0) == 1) {
+		wake_up(&(q->wait_queue));
 		kfree(q);
-		printk("qqmodule: destroy_queueue -> loooooooop\n");
 		for(i = 0; i < LIST_SIZE; i++) {
 			if(map[i] != 0) {
 				if(map[i]->queue_id == queue_id) {
 					c = map[i];
-					if(cas(&(map[i]), (int) map[i], 0)) {
+					if(cas(&(map[i]), (int) map[i], 0) == 1) {
 						res = cas(&free_map_slots, free_map_slots, free_map_slots+1);
 						kfree(c);
 					}
@@ -403,6 +421,7 @@ static int leave_queue(int queue_id, int pid) {
 	int conn_index;
 	int hasFound;
 	int res;
+	int npid;
 	Connection * c;
 	
 	hasFound = 0;
@@ -416,7 +435,7 @@ static int leave_queue(int queue_id, int pid) {
 		   map[conn_index]->queue_id == queue_id) {
 		   	hasFound=1;
 		   	c = map[conn_index];
-		   	if(cas(&(map[conn_index]), (int) map[conn_index], 0)) {
+		   	if(cas(&(map[conn_index]), (int) map[conn_index], 0) == 1) {
 		   		res = cas(&free_map_slots, free_map_slots, free_map_slots+1);
 		   		kfree(c);
 		   	}
@@ -428,10 +447,12 @@ static int leave_queue(int queue_id, int pid) {
 	if(hasFound == 0)
 		return -3;
 
-	if(queue_list[queue_id]->pid_number == 1) // Vai ter de ser mudado provavelmente
+	npid = queue_list[queue_id]->pid_number;
+	if(npid == 1) // Vai ter de ser mudado provavelmente
 		destroy_queue(queue_id);
-	else
-		queue_list[queue_id]->pid_number -= 1;
+	else {
+		cas(&(queue_list[queue_id]->pid_number), pid, pid-1);
+	}
 
 	return 0;
 }
@@ -474,6 +495,10 @@ static void __exit qqmodule_exit(void) {
 			printk("qqmodule Destroying queue %d\n", i);
 			destroy_queue(i);
 		}
+	}
+
+	for(i = 0; i < MAP_SIZE; i++) {
+		kfree(map[i]);
 	}
 
     printk("qqmodule exited\n");
